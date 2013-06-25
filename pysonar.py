@@ -7,8 +7,6 @@ from ast import *
 from lists import *
 
 
-
-
 ####################################################################
 ## global parameters
 ####################################################################
@@ -106,8 +104,9 @@ class PrimType(Type):
 
 
 class ClassType(Type):
-    def __init__(self, name):
+    def __init__(self, name, constructor):
         self.name = name
+        self.func = constructor
     def __repr__(self):
         return "class:" + self.name
     def __eq__(self, other):
@@ -358,13 +357,13 @@ def onStack(call, args, stk):
 
 # invoke one closure
 def invoke1(call, clo, env, stk):
-
+    print 'invoking', call.func
     if (clo == bottomType):
         return [bottomType]
 
     # Even if operator is not a closure, resolve the
     # arguments for partial information.
-    if not IS(clo, Closure):
+    if not IS(clo, Closure) and not IS(clo, ClassType):
         for a in call.args:
             t1 = infer(a, env, stk)
         for k in call.keywords:
@@ -454,6 +453,7 @@ def invoke1(call, clo, env, stk):
 # invoke a union of closures. call invoke1 on each of them and collect
 # their return types into a union
 def invoke(call, env, stk):
+    print 'invoking', call.func
     clos = infer(call.func, env, stk)
     totypes = []
     for clo in clos:
@@ -522,6 +522,7 @@ def inferSeq(exp, env, stk):
 
     elif IS(e, FunctionDef):
         cs = lookup(e.name, env)
+        print 'Func:', cs
         for c in cs:
             c.env = env                          # create circular env to support recursion
         for d in e.args.defaults:                # infer types for default arguments
@@ -538,6 +539,25 @@ def inferSeq(exp, env, stk):
 
     elif IS(e, Expr):
         t1 = infer(e.value, env, stk)
+        return inferSeq(exp[1:], env, stk)
+
+    elif IS(e, ImportFrom):
+        return inferSeq(exp[1:], env, stk)
+
+    elif IS(e, Import):
+        return inferSeq(exp[1:], env, stk)
+
+    elif IS(e, ClassDef):
+        t1 = infer(e, env, stk)
+        classPair = append(e.name, t1)
+        print 'classPair', classPair
+        print 'env:', env
+        env = append(env, Pair(classPair, nil))
+        #return [ClassType(exp.name)]
+        (t2, env2) = inferSeq(exp[1:], env, stk)
+        return (t2, env2)
+
+    elif IS(e, TryExcept):
         return inferSeq(exp[1:], env, stk)
 
     else:
@@ -563,7 +583,9 @@ def infer(exp, env, stk):
         return [PrimType(type(exp.s))]
 
     elif IS(exp, Name):
+        print "Name:" + str(exp), 'ID:', exp.id
         b = lookup(exp.id, env)
+        print b
         if (b <> None):
             putInfo(exp, b)
             return b
@@ -584,6 +606,10 @@ def infer(exp, env, stk):
 
     elif IS(exp, Call):
         return invoke(exp, env, stk)
+
+    elif IS(exp, ClassDef):
+        c = ClassType(exp.name)
+        return [c]
 
     ## ignore complex types for now
     # elif IS(exp, List):
@@ -749,6 +775,6 @@ def installPrinter():
 
 installPrinter()
 
-
+import sys
 # test the checker on a file
-checkFile('tests/chain.py')
+checkFile(sys.argv[1])
