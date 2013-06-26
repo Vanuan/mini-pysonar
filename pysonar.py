@@ -5,14 +5,14 @@ import sys
 import re
 from ast import *
 from lists import *
-
+from collections import defaultdict
 
 ####################################################################
 ## global parameters
 ####################################################################
 IS = isinstance
 
-
+MYDICT = defaultdict(set)
 
 ####################################################################
 ## utilities
@@ -104,14 +104,41 @@ class PrimType(Type):
 
 
 class ClassType(Type):
-    def __init__(self, name, constructor):
+    def __init__(self, name, body, env):
+        print "Body", body
         self.name = name
-        self.func = constructor
+        self.env = env
+        self.classattrs = {}
+        for classattr in body:
+            if IS(classattr, FunctionDef):
+                self.classattrs[classattr.name] = classattr
     def __repr__(self):
         return "class:" + self.name
     def __eq__(self, other):
         if IS(other, ClassType):
             return self.name == other.name
+        else:
+            return False
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+class ObjType(Type):
+    def __init__(self, classtype, ctorargs, env):
+        self.classtype = classtype
+        self.attrs = {}
+        for name, attr in self.classtype.classattrs.iteritems():
+            self.attrs[name] = Closure(attr, env)
+        self.ctorargs = ctorargs
+
+    def __repr__(self):
+        return (str(self.classtype.name) + " instance, ctor:" +
+                str(self.ctorargs) + ", attrs:" + str(self.attrs))
+
+    def __eq__(self, other):
+        if IS(other, ObjType):
+            return ((self.classtype == other.classtype) and
+                    self.attrs == other.attrs)
         else:
             return False
     def __ne__(self, other):
@@ -128,6 +155,21 @@ class FuncType(Type):
         if IS(other, FuncType):
             return ((self.fromtype == other.fromtype) and
                     self.totype == other.totype)
+        else:
+            return False
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
+
+class AttrType(Type):
+    def __init__(self, closure, o):
+        self.clo = closure
+        self.obj = o
+    def __repr__(self):
+        return str(self.clo)
+    def __eq__(self, other):
+        if IS(other, FuncType):
+            return (self.clo == other.clo)
         else:
             return False
     def __ne__(self, other):
@@ -357,13 +399,13 @@ def onStack(call, args, stk):
 
 # invoke one closure
 def invoke1(call, clo, env, stk):
-    print 'invoking', call.func
+    print 'invoking', call.func, call.args
     if (clo == bottomType):
         return [bottomType]
 
     # Even if operator is not a closure, resolve the
     # arguments for partial information.
-    if not IS(clo, Closure) and not IS(clo, ClassType):
+    if not IS(clo, Closure) and not IS(clo, ClassType) and not IS(clo, AttrType):
         for a in call.args:
             t1 = infer(a, env, stk)
         for k in call.keywords:
@@ -371,6 +413,12 @@ def invoke1(call, clo, env, stk):
         err = TypeError('calling non-callable', clo)
         putInfo(call, err)
         return [err]
+    if IS(clo, ClassType):
+        return [ObjType(clo, call.args, env)]
+    if IS(clo, AttrType):
+        MYDICT[clo.obj.classtype.name].add((clo.obj.ctorargs[0].s, call.args[0].s))
+        return [clo.clo]
+
 
     func = clo.func
     fenv = clo.env
@@ -549,7 +597,7 @@ def inferSeq(exp, env, stk):
 
     elif IS(e, ClassDef):
         t1 = infer(e, env, stk)
-        classPair = append(e.name, t1)
+        classPair = append(Pair(e.name, nil), t1)
         print 'classPair', classPair
         print 'env:', env
         env = append(env, Pair(classPair, nil))
@@ -558,6 +606,9 @@ def inferSeq(exp, env, stk):
         return (t2, env2)
 
     elif IS(e, TryExcept):
+        return inferSeq(exp[1:], env, stk)
+
+    elif IS(e, Pass):
         return inferSeq(exp[1:], env, stk)
 
     else:
@@ -608,8 +659,20 @@ def infer(exp, env, stk):
         return invoke(exp, env, stk)
 
     elif IS(exp, ClassDef):
-        c = ClassType(exp.name)
+        c = ClassType(exp.name, exp.body, env)
         return [c]
+
+    elif IS(exp, Attribute):
+        print 'Attribute:', exp.value, exp.attr
+        print env
+        objs = lookup(exp.value.id, env)
+        attribs = []
+        for o in objs:
+            if exp.attr in o.attrs:
+                attribs.append(AttrType(o.attrs[exp.attr], o))
+            else:
+                attribs.append(TypeError('no such attribute', exp.attr))
+        return attribs
 
     ## ignore complex types for now
     # elif IS(exp, List):
@@ -778,3 +841,4 @@ installPrinter()
 import sys
 # test the checker on a file
 checkFile(sys.argv[1])
+print MYDICT.items()
