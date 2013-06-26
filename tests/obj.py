@@ -7,13 +7,20 @@ class ObjectStateHolder(object):
 class AttributeStateHolder(object):
     pass
 
-o = ObjectStateHolder('Ooo')
-o.setAttribute('attrname', 'val')
-o.setIntAttribute('attrname1', 'val1')
+def main(F):
 
-o = ObjectStateHolder('Ooo1')
-o.setAttribute('attrname3', 'val')
-o.setIntAttribute('attrname4', 'val1')
+    creds = F.getCreds()
+    for cred in creds:
+        cred.get()
+        o = ObjectStateHolder('Ooo')
+        o.setAttribute('attrname', 'val')
+        o.setIntAttribute('attrname1', 'val1')
 
-o = ObjectStateHolder('AAA')
-#o.setAttribute(AttributeStateHolder())
+        o = ObjectStateHolder('Ooo1')
+        o.setAttribute('attrname3', 'val')
+        o.setIntAttribute('attrname4', 'val1')
+
+        o = ObjectStateHolder('AAA')
+        #o.setAttribute(AttributeStateHolder())
+
+main(F)

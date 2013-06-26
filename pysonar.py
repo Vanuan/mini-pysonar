@@ -562,6 +562,30 @@ def inferSeq(exp, env, stk):
             t2 = finalize(t2)
             return (union([t1, t2, t3]), env3)
 
+    elif IS(e, For):
+        (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
+        (t2, env2) = inferSeq(e.orelse, close(e.orelse, env), stk)
+
+        if isTerminating(t1) and isTerminating(t2):                   # both terminates
+            for e2 in exp[1:]:
+                putInfo(e2, TypeError('unreachable code'))
+            return (union([t1, t2]), env)
+
+        elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
+            (t3, env3) = inferSeq(exp[1:], env2, stk)
+            t2 = finalize(t2)
+            return (union([t1, t2, t3]), env3)
+
+        elif not isTerminating(t1) and isTerminating(t2):             # t2 terminates
+            (t3, env3) = inferSeq(exp[1:], env1, stk)
+            t1 = finalize(t1)
+            return (union([t1, t2, t3]), env3)
+        else:                                                         # both non-terminating
+            (t3, env3) = inferSeq(exp[1:], mergeEnv(env1, env2), stk)
+            t1 = finalize(t1)
+            t2 = finalize(t2)
+            return (union([t1, t2, t3]), env3)
+
     elif IS(e, Assign):
         t = infer(e.value, env, stk)
         for x in e.targets:
@@ -605,7 +629,16 @@ def inferSeq(exp, env, stk):
         (t2, env2) = inferSeq(exp[1:], env, stk)
         return (t2, env2)
 
+    elif IS(e, Break):
+        return inferSeq(exp[1:], env, stk)
+
     elif IS(e, TryExcept):
+        return inferSeq(exp[1:], env, stk)
+
+    elif IS(e, TryFinally):
+        return inferSeq(exp[1:], env, stk)
+
+    elif IS(e, Raise):
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, Pass):
@@ -665,14 +698,17 @@ def infer(exp, env, stk):
     elif IS(exp, Attribute):
         print 'Attribute:', exp.value, exp.attr
         print env
-        objs = lookup(exp.value.id, env)
-        attribs = []
-        for o in objs:
-            if exp.attr in o.attrs:
-                attribs.append(AttrType(o.attrs[exp.attr], o))
-            else:
-                attribs.append(TypeError('no such attribute', exp.attr))
-        return attribs
+        t = infer(exp.value, env, stk)
+        if t:
+            attribs = []
+            for o in filter(lambda obj: IS(obj, ObjType), t):
+                if exp.attr in o.attrs:
+                    attribs.append(AttrType(o.attrs[exp.attr], o))
+                else:
+                    attribs.append(TypeError('no such attribute', exp.attr))
+            return attribs
+        else:
+            return [UnknownType()]
 
     ## ignore complex types for now
     # elif IS(exp, List):
