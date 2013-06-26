@@ -6,6 +6,7 @@ import re
 from ast import *
 from lists import *
 from collections import defaultdict
+import os
 
 ####################################################################
 ## global parameters
@@ -13,6 +14,7 @@ from collections import defaultdict
 IS = isinstance
 
 MYDICT = defaultdict(set)
+PYTHONPATH = []
 
 ####################################################################
 ## utilities
@@ -105,7 +107,7 @@ class PrimType(Type):
 
 class ClassType(Type):
     def __init__(self, name, body, env):
-        print "Body", body
+        #print "ClassType Body", body
         self.name = name
         self.env = env
         self.classattrs = {}
@@ -414,6 +416,7 @@ def invoke1(call, clo, env, stk):
         putInfo(call, err)
         return [err]
     if IS(clo, ClassType):
+        print 'creating instance of', clo
         return [ObjType(clo, call.args, env)]
     if IS(clo, AttrType):
         MYDICT[clo.obj.classtype.name].add((clo.obj.ctorargs[0].s, call.args[0].s))
@@ -532,8 +535,10 @@ def finalize(t):
 
 # infer a sequence of statements
 def inferSeq(exp, env, stk):
+    #print 'Infering sequence', exp, env, stk
 
     if exp == []:                       # reached end without return
+        #print 'Sequence end, returning', env
         return ([contType], env)
 
     e = exp[0]
@@ -593,8 +598,12 @@ def inferSeq(exp, env, stk):
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, FunctionDef):
+        #import traceback
+        #print ''.join(traceback.format_stack())
+        #print 'infering', e, env
         cs = lookup(e.name, env)
-        print 'Func:', cs
+        if not cs:
+            print 'Function %s not found in scope %s' % (e.name, env)
         for c in cs:
             c.env = env                          # create circular env to support recursion
         for d in e.args.defaults:                # infer types for default arguments
@@ -614,6 +623,20 @@ def inferSeq(exp, env, stk):
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, ImportFrom):
+        #print 'importing module', e.module
+        module = getModuleExp(e.module)
+        if module:
+            env1 = close(module.body, nil)  # TODO refactor along with infer(list)
+            _, module_symbols = inferSeq(module.body, env1, nil)
+            #print 'module %s imported' % e.module
+            #print 'module', e.module, module_symbols
+            for module_name in e.names:
+                name_to_import = module_name.name
+                name_import_as = module_name.asname or name_to_import
+                module_symbol = lookup(name_to_import, module_symbols)
+                #print module_name.name, module_symbol
+                env = append(Pair(Pair(name_import_as, module_symbol), nil), env)
+            #names = map(lambda name: module.body ,e.names)
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, Import):
@@ -622,8 +645,8 @@ def inferSeq(exp, env, stk):
     elif IS(e, ClassDef):
         t1 = infer(e, env, stk)
         classPair = append(Pair(e.name, nil), t1)
-        print 'classPair', classPair
-        print 'env:', env
+        #print 'classPair', classPair
+        #print 'env:', env
         env = append(env, Pair(classPair, nil))
         #return [ClassType(exp.name)]
         (t2, env2) = inferSeq(exp[1:], env, stk)
@@ -651,8 +674,9 @@ def inferSeq(exp, env, stk):
 
 # main type inferencer
 def infer(exp, env, stk):
-
+    #print 'infer', exp
     if IS(exp, Module):
+        #print 'infering module', env
         return infer(exp.body, env, stk)
 
     elif IS(exp, list):
@@ -667,9 +691,9 @@ def infer(exp, env, stk):
         return [PrimType(type(exp.s))]
 
     elif IS(exp, Name):
-        print "Name:" + str(exp), 'ID:', exp.id
+        #print "Name:" + str(exp), 'ID:', exp.id
         b = lookup(exp.id, env)
-        print b
+        #print b
         if (b <> None):
             putInfo(exp, b)
             return b
@@ -696,8 +720,8 @@ def infer(exp, env, stk):
         return [c]
 
     elif IS(exp, Attribute):
-        print 'Attribute:', exp.value, exp.attr
-        print env
+        #print 'Attribute:', exp.value, exp.attr
+        #print env
         t = infer(exp.value, env, stk)
         if t:
             attribs = []
@@ -772,6 +796,22 @@ def checkString(s):
 def checkFile(filename):
     f = open(filename, 'r');
     checkString(f.read())
+
+
+def getModuleExp(modulename):
+    modulename = modulename.replace('.', os.path.sep)
+    if PYTHONPATH:
+        directory_name = PYTHONPATH[0]
+    else:
+        directory_name = '.'
+    try:
+        f = open(os.path.join(directory_name, modulename + '.py'), 'r')
+        s = f.read()
+        f.close()
+    except IOError, e:
+        print e
+        return parse('')
+    return parse(s)
 
 
 
@@ -865,6 +905,10 @@ def printAst(node):
         return ret
 
 
+def addToPythonPath(dirname):
+    PYTHONPATH.append(dirname)
+
+
 def installPrinter():
     import inspect
     import ast
@@ -876,5 +920,6 @@ installPrinter()
 
 import sys
 # test the checker on a file
+addToPythonPath(os.path.dirname(sys.argv[1]))
 checkFile(sys.argv[1])
 print MYDICT.items()

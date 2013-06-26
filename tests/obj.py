@@ -1,20 +1,14 @@
-class ObjectStateHolder(object):
-    def setAttribute(name, val):
-        pass
-    def setIntAttribute(name, val):
-        pass
-
-class AttributeStateHolder(object):
-    pass
+from globals import ObjectStateHolder
 
 def main(F):
 
     creds = F.getCreds()
     for cred in creds:
         cred.get()
-        o = ObjectStateHolder('Ooo')
-        o.setAttribute('attrname', 'val')
-        o.setIntAttribute('attrname1', 'val1')
+        o = ObjectStateHolder('OSH1')
+        o.setAttribute('attr1', 'val1')
+        o.setIntAttribute('attr2', 'val2')
+        other(o)
 
         o = ObjectStateHolder('Ooo1')
         o.setAttribute('attrname3', 'val')
@@ -22,5 +16,8 @@ def main(F):
 
         o = ObjectStateHolder('AAA')
         #o.setAttribute(AttributeStateHolder())
+
+def other(osh):
+    osh.setAttribute('OSH attr3')
 
 main(F)
