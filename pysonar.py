@@ -656,10 +656,59 @@ def inferSeq(exp, env, stk):
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, TryExcept):
-        return inferSeq(exp[1:], env, stk)
+        (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
+        (t2, env2) = inferSeq(e.orelse, close(e.orelse, env), stk)
+        (t4, env4) = inferSeq(e.handlers, close(e.handlers, env), stk)
+
+        if isTerminating(t1) and isTerminating(t2):                   # both terminates
+            for e2 in exp[1:]:
+                putInfo(e2, TypeError('unreachable code'))
+            return (union([t1, t2]), env)
+
+        elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
+            (t3, env3) = inferSeq(exp[1:], env2, stk)
+            t2 = finalize(t2)
+            return (union([t1, t2, t3]), env3)
+
+        elif not isTerminating(t1) and isTerminating(t2):             # t2 terminates
+            (t3, env3) = inferSeq(exp[1:], env1, stk)
+            t1 = finalize(t1)
+            return (union([t1, t2, t3]), env3)
+        else:                                                         # both non-terminating
+            (t3, env3) = inferSeq(exp[1:], mergeEnv(env1, env2), stk)
+            t1 = finalize(t1)
+            t2 = finalize(t2)
+            return (union([t1, t2, t3]), env3)
+
 
     elif IS(e, TryFinally):
-        return inferSeq(exp[1:], env, stk)
+        (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
+        (t2, env2) = inferSeq(e.finalbody, close(e.finalbody, env), stk)
+
+        if isTerminating(t1) and isTerminating(t2):                   # both terminates
+            for e2 in exp[1:]:
+                putInfo(e2, TypeError('unreachable code'))
+            return (union([t1, t2]), env)
+
+        elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
+            (t3, env3) = inferSeq(exp[1:], env2, stk)
+            t2 = finalize(t2)
+            return (union([t1, t2, t3]), env3)
+
+        elif not isTerminating(t1) and isTerminating(t2):             # t2 terminates
+            (t3, env3) = inferSeq(exp[1:], env1, stk)
+            t1 = finalize(t1)
+            return (union([t1, t2, t3]), env3)
+        else:                                                         # both non-terminating
+            (t3, env3) = inferSeq(exp[1:], mergeEnv(env1, env2), stk)
+            t1 = finalize(t1)
+            t2 = finalize(t2)
+            return (union([t1, t2, t3]), env3)
+
+    elif IS(e, ExceptHandler):
+        (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
+        (t3, env3) = inferSeq(exp[1:], env1, stk)
+        return (union([t1, t3]), env3)
 
     elif IS(e, Raise):
         return inferSeq(exp[1:], env, stk)
