@@ -13,7 +13,7 @@ import os
 ####################################################################
 IS = isinstance
 
-MYDICT = defaultdict(set)
+MYDICT = defaultdict(list)
 PYTHONPATH = []
 
 ####################################################################
@@ -417,12 +417,15 @@ def invoke1(call, clo, env, stk):
         return [err]
     if IS(clo, ClassType):
         print 'creating instance of', clo
-        return [ObjType(clo, call.args, env)]
+        ctorargs = map(lambda arg: infer(arg, env, stk), call.args)
+        return [ObjType(clo, ctorargs, env)]
     if IS(clo, AttrType):
+        # invoking attribute
         if call.args:
-            ctorargs = tuple(map(lambda a: a.s, clo.obj.ctorargs))
+            ctorargs = tuple(map(lambda a: a, clo.obj.ctorargs))
             callargs = tuple(map(lambda a: a, call.args))
-            MYDICT[clo.obj.classtype.name].add((ctorargs, callargs))
+            #callargs = map(lambda arg: infer(arg, env, stk), call.args)
+            MYDICT[clo.obj.classtype.name].append((ctorargs, callargs, env))
         return [clo.clo]
 
 
@@ -573,7 +576,8 @@ def inferSeq(exp, env, stk):
             t2 = finalize(t2)
             return (union([t1, t2, t3]), env3)
 
-    elif IS(e, For):
+    elif IS(e, While):
+        # todo evaluate test
         (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
         (t2, env2) = inferSeq(e.orelse, close(e.orelse, env), stk)
 
@@ -596,6 +600,33 @@ def inferSeq(exp, env, stk):
             t1 = finalize(t1)
             t2 = finalize(t2)
             return (union([t1, t2, t3]), env3)
+
+    elif IS(e, For):
+        # TODO evaluate iter and target
+        (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
+        (t2, env2) = inferSeq(e.orelse, close(e.orelse, env), stk)
+
+        if isTerminating(t1) and isTerminating(t2):                   # both terminates
+            for e2 in exp[1:]:
+                putInfo(e2, TypeError('unreachable code'))
+            return (union([t1, t2]), env)
+
+        elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
+            (t3, env3) = inferSeq(exp[1:], env2, stk)
+            t2 = finalize(t2)
+            return (union([t1, t2, t3]), env3)
+
+        elif not isTerminating(t1) and isTerminating(t2):             # t2 terminates
+            (t3, env3) = inferSeq(exp[1:], env1, stk)
+            t1 = finalize(t1)
+            return (union([t1, t2, t3]), env3)
+        else:                                                         # both non-terminating
+            (t3, env3) = inferSeq(exp[1:], mergeEnv(env1, env2), stk)
+            t1 = finalize(t1)
+            t2 = finalize(t2)
+            return (union([t1, t2, t3]), env3)
+
+
 
     elif IS(e, Assign):
         t = infer(e.value, env, stk)
@@ -664,6 +695,9 @@ def inferSeq(exp, env, stk):
         return (t2, env2)
 
     elif IS(e, Break):
+        return inferSeq(exp[1:], env, stk)
+
+    elif IS(e, Continue):
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, TryExcept):
@@ -748,10 +782,12 @@ def infer(exp, env, stk):
         return t
 
     elif IS(exp, Num):
-        return [PrimType(type(exp.n))]
+        # we need objects, not types
+        return [exp]#[PrimType(type(exp.n))]
 
     elif IS(exp, Str):
-        return [PrimType(type(exp.s))]
+        # we need objects, not types
+        return [exp]#[PrimType(type(exp.s))]
 
     elif IS(exp, Name):
         #print "Name:" + str(exp), 'ID:', exp.id
