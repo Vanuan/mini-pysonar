@@ -2,9 +2,9 @@
 
 This is a hacky fork that intends to infer the following information about method calls:
 
-   * className, constructor parameters, method invocation parameters
-   * instead of infering type, it would infer object states
-   * we would infer only string constants;
+  * className, constructor parameters, method invocation parameters
+  * instead of infering type, it would infer object states
+  * we would infer only string constants;
    
 Of course, there is no way to infer strings that are provided as input parameters.
 
@@ -14,9 +14,8 @@ Sounds ambitious.
 
 Here's a less ambitious goal:
    
-    * find "live" code, i.e. all lines of code that could possibly be executed after running script (all branches are evaluated)
-    * after that we can easily "grep" these lines for our constants set
-
+  * find "live" code, i.e. all lines of code that could possibly be executed after running script (all branches are evaluated)
+  * after that we can easily "grep" these lines for our constants set
 
 # Original README
 
