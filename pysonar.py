@@ -401,7 +401,7 @@ def onStack(call, args, stk):
 
 # invoke one closure
 def invoke1(call, clo, env, stk):
-    print 'invoking', call.func, call.args
+    print 'invoking', call.func, 'with args', call.args
     if (clo == bottomType):
         return [bottomType]
 
@@ -419,7 +419,10 @@ def invoke1(call, clo, env, stk):
         print 'creating instance of', clo
         return [ObjType(clo, call.args, env)]
     if IS(clo, AttrType):
-        MYDICT[clo.obj.classtype.name].add((clo.obj.ctorargs[0].s, call.args[0].s))
+        if call.args:
+            ctorargs = tuple(map(lambda a: a.s, clo.obj.ctorargs))
+            callargs = tuple(map(lambda a: a, call.args))
+            MYDICT[clo.obj.classtype.name].add((ctorargs, callargs))
         return [clo.clo]
 
 
@@ -505,6 +508,9 @@ def invoke1(call, clo, env, stk):
 # their return types into a union
 def invoke(call, env, stk):
     print 'invoking', call.func
+    print 'infering arguments', call.args
+    for arg in call.args:
+        infer(arg, env, stk)
     clos = infer(call.func, env, stk)
     totypes = []
     for clo in clos:
@@ -625,21 +631,26 @@ def inferSeq(exp, env, stk):
     elif IS(e, ImportFrom):
         #print 'importing module', e.module
         module = getModuleExp(e.module)
-        if module:
-            env1 = close(module.body, nil)  # TODO refactor along with infer(list)
-            _, module_symbols = inferSeq(module.body, env1, nil)
-            #print 'module %s imported' % e.module
-            #print 'module', e.module, module_symbols
-            for module_name in e.names:
-                name_to_import = module_name.name
-                name_import_as = module_name.asname or name_to_import
-                module_symbol = lookup(name_to_import, module_symbols)
-                #print module_name.name, module_symbol
-                env = append(Pair(Pair(name_import_as, module_symbol), nil), env)
-            #names = map(lambda name: module.body ,e.names)
+        env1 = close(module.body, nil)  # TODO refactor along with infer(list)
+        _, module_symbols = inferSeq(module.body, env1, nil)
+        #print 'module %s imported' % e.module
+        #print 'module', e.module, module_symbols
+        for module_name in e.names:
+            name_to_import = module_name.name
+            name_import_as = module_name.asname or name_to_import
+            module_symbol = lookup(name_to_import, module_symbols)
+            #print module_name.name, module_symbol
+            env = append(Pair(Pair(name_import_as, module_symbol), nil), env)
+        #names = map(lambda name: module.body ,e.names)
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, Import):
+        for module_name in e.names:
+            name_to_import = module_name.name
+            module = getModuleExp(name_to_import)
+            module_env = close(module.body, nil)
+            _, module_symbols = inferSeq(module.body, module_env, nil)
+            name_import_as = module_name.asname
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, ClassDef):
@@ -714,6 +725,9 @@ def inferSeq(exp, env, stk):
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, Pass):
+        return inferSeq(exp[1:], env, stk)
+
+    elif IS(e, Print):
         return inferSeq(exp[1:], env, stk)
 
     else:
@@ -967,8 +981,8 @@ def installPrinter():
 
 installPrinter()
 
-import sys
-# test the checker on a file
-addToPythonPath(os.path.dirname(sys.argv[1]))
-checkFile(sys.argv[1])
-print MYDICT.items()
+if __name__ == '__main__':
+    import sys
+    # test the checker on a file
+    addToPythonPath(os.path.dirname(sys.argv[1]))
+    checkFile(sys.argv[1])
