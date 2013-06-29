@@ -130,7 +130,7 @@ class ObjType(Type):
         self.classtype = classtype
         self.attrs = {}
         for name, attr in self.classtype.classattrs.iteritems():
-            self.attrs[name] = Closure(attr, env)
+            self.attrs[name] = Closure(attr, classtype.env)
         self.ctorargs = ctorargs
 
     def __repr__(self):
@@ -165,6 +165,7 @@ class FuncType(Type):
 
 class AttrType(Type):
     def __init__(self, closure, o):
+        # self.env = closure.env
         self.clo = closure
         self.obj = o
     def __repr__(self):
@@ -399,9 +400,18 @@ def onStack(call, args, stk):
     return False
 
 
+def saveMethodInvocationInfo(call, clo, env):
+    if call.args:
+        ctorargs = tuple(map(lambda a: a, clo.obj.ctorargs))
+        callargs = tuple(map(lambda a: a, call.args))
+        #callargs = map(lambda arg: infer(arg, env, stk), call.args)
+        MYDICT[clo.obj.classtype.name].append((ctorargs, callargs, env))
+
+def getMethodInvocationInfo():
+    return MYDICT
+
 # invoke one closure
 def invoke1(call, clo, env, stk):
-    print 'invoking', call.func, 'with args', call.args
     if (clo == bottomType):
         return [bottomType]
 
@@ -418,16 +428,17 @@ def invoke1(call, clo, env, stk):
     if IS(clo, ClassType):
         print 'creating instance of', clo
         ctorargs = map(lambda arg: infer(arg, env, stk), call.args)
-        return [ObjType(clo, ctorargs, env)]
+        return [ObjType(clo, ctorargs, clo.env)]
     if IS(clo, AttrType):
+        saveMethodInvocationInfo(call, clo, env)
+        attr = clo
         # invoking attribute
-        if call.args:
-            ctorargs = tuple(map(lambda a: a, clo.obj.ctorargs))
-            callargs = tuple(map(lambda a: a, call.args))
-            #callargs = map(lambda arg: infer(arg, env, stk), call.args)
-            MYDICT[clo.obj.classtype.name].append((ctorargs, callargs, env))
-        return [clo.clo]
+        print 'invoking method', attr.clo.func.name, 'with args', call.args
+        env = attr.obj.classtype.env
+        return invoke1(call, attr.clo, env, stk)
+        # return [clo.clo]
 
+    print 'invoking closure', clo.func, 'with args', call.args
 
     func = clo.func
     fenv = clo.env
@@ -510,15 +521,17 @@ def invoke1(call, clo, env, stk):
 # invoke a union of closures. call invoke1 on each of them and collect
 # their return types into a union
 def invoke(call, env, stk):
-    print 'invoking', call.func
-    print 'infering arguments', call.args
-    for arg in call.args:
-        infer(arg, env, stk)
+    # print 'invoking', call.func
     clos = infer(call.func, env, stk)
+    # print 'closure', clos
     totypes = []
     for clo in clos:
         t = invoke1(call, clo, env, stk)
         totypes = totypes + t
+    # infer arguments even if we don't know which method it is
+    print 'in case of unknown object, infering arguments', call.args
+    for arg in call.args:
+        infer(arg, env, stk)
     return totypes
 
 
@@ -626,12 +639,15 @@ def inferSeq(exp, env, stk):
             t2 = finalize(t2)
             return (union([t1, t2, t3]), env3)
 
-
-
     elif IS(e, Assign):
         t = infer(e.value, env, stk)
         for x in e.targets:
             env = bind(x, t, env)
+        return inferSeq(exp[1:], env, stk)
+
+    elif IS(e, AugAssign):
+        t = infer(e.value, env, stk)
+        env = bind(e.target, t, env)
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, FunctionDef):
@@ -679,9 +695,13 @@ def inferSeq(exp, env, stk):
         for module_name in e.names:
             name_to_import = module_name.name
             module = getModuleExp(name_to_import)
-            module_env = close(module.body, nil)
-            _, module_symbols = inferSeq(module.body, module_env, nil)
-            name_import_as = module_name.asname
+            env1 = close(module.body, nil)
+            _, module_env = inferSeq(module.body, env1, nil)
+            #module_env = close(module.body, nil)
+            name_import_as = module_name.asname or module_name.name
+            module_class = ClassType('module', module.body, module_env)
+            module_obj = [ObjType(module_class, [], env)]  # probably env is not needed here
+            env = append(Pair(Pair(name_import_as, module_obj), nil), env)
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, ClassDef):
@@ -824,6 +844,7 @@ def infer(exp, env, stk):
         t = infer(exp.value, env, stk)
         if t:
             attribs = []
+            # find attr name in object and return it
             for o in filter(lambda obj: IS(obj, ObjType), t):
                 if exp.attr in o.attrs:
                     attribs.append(AttrType(o.attrs[exp.attr], o))

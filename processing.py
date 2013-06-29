@@ -14,8 +14,8 @@ def convertName(arg, env):
 if __name__ == '__main__':
     pysonar.addToPythonPath(os.path.dirname(sys.argv[1]))
     pysonar.checkFile(sys.argv[1])
-    for class_name, val in pysonar.MYDICT.items():
+    for class_name, val in pysonar.getMethodInvocationInfo().items():
         print class_name
         for constrargs, args, env in val:
             print constrargs, args
-            print '\t', constrargs, map(lambda arg: convertName(arg, env), args)
+#            print '\t', constrargs, map(lambda arg: convertName(arg, env), args)
