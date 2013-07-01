@@ -10,7 +10,7 @@ import os
 import logging
 from functools import partial
 
-logging.basicConfig(filename="pysonar.log", level=logging.WARN)
+logging.basicConfig(filename="_pysonar.log", level=logging.WARN)
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.WARN)
 
@@ -171,8 +171,9 @@ class ObjType(Type):
         self.ctorargs = ctorargs
 
     def __repr__(self):
-        return (str(self.classtype.name) + " instance, ctor:" +
-                str(self.ctorargs) + ", attrs:" + str(self.attrs))
+        return (str(self.classtype.name) + " instance" #+", ctor:" +
+                #str(self.ctorargs) + ", attrs:" + str(self.attrs)
+                )
 
     def __eq__(self, other):
         if IS(other, ObjType):
@@ -201,10 +202,11 @@ class FuncType(Type):
 
 
 class AttrType(Type):
-    def __init__(self, closure, o):
+    def __init__(self, closure, o, objT):
         # self.env = closure.env
         self.clo = closure
         self.obj = o
+        self.objT = objT
     def __repr__(self):
         return str(self.clo)
     def __eq__(self, other):
@@ -467,20 +469,22 @@ def invoke1(call, clo, env, stk):
         ctorargs = map(lambda arg: infer(arg, env, stk), call.args)
         return [ObjType(clo, ctorargs, clo.env)]
     if IS(clo, AttrType):
-        saveMethodInvocationInfo(call, clo, env)
         attr = clo
-
         # add self to function call args
+        actualParams = list(call.args)
+        # TODO: @staticmethod, @classmethod
         if attr.obj.classtype.name != 'module':
-            call.args.insert(0, attr.obj)
+            actualParams.insert(0, attr.objT)  # this is bad, I'm modifying AST! 
+        saveMethodInvocationInfo(call, clo, env)
 
-        # invoking attribute
         debug('invoking method', attr.clo.func.name, 'with args', call.args)
-        env = attr.obj.classtype.env
-        return invoke1(call, attr.clo, env, stk)
-        # return [clo.clo]
+        return invokeClosure(call, actualParams, attr.clo, env, stk)
+    invokeClosure(call, call.args, clo, env, stk)
 
-    debug('invoking closure', clo.func, 'with args', call.args)
+
+def invokeClosure(call, actualParams, clo, env, stk):
+    debug('invoking closure', clo.func, 'with args', actualParams)
+    debug(clo.func.body)
 
     func = clo.func
     fenv = clo.env
@@ -488,22 +492,22 @@ def invoke1(call, clo, env, stk):
     kwarg = nil
 
     # bind positionals first
-    poslen = min(len(func.args.args), len(call.args))
+    poslen = min(len(func.args.args), len(actualParams))
     for i in xrange(poslen):
-        t = infer(call.args[i], env, stk)
+        t = infer(actualParams[i], env, stk)
         pos = bind(func.args.args[i], t, pos)
 
     # put extra positionals into vararg if provided
     # report error and go on otherwise
-    if len(call.args) > len(func.args.args):
+    if len(actualParams) > len(func.args.args):
         if func.args.vararg == None:
             err = TypeError('excess arguments to function')
             putInfo(call, err)
             return [err]
         else:
             ts = []
-            for i in xrange(len(func.args.args), len(call.args)):
-                t = infer(call.args[i], env, stk)
+            for i in xrange(len(func.args.args), len(actualParams)):
+                t = infer(actualParams[i], env, stk)
                 ts = ts + t
             pos = bind(func.args.vararg, ts, pos)
 
@@ -599,7 +603,7 @@ def finalize(t):
 
 # infer a sequence of statements
 def inferSeq(exp, env, stk):
-    #print 'Infering sequence', exp, env, stk
+    debug('Infering sequence', exp)
 
     if exp == []:                       # reached end without return
         #print 'Sequence end, returning', env
@@ -835,7 +839,7 @@ def inferSeq(exp, env, stk):
 
 # main type inferencer
 def infer(exp, env, stk):
-    #print 'infer', exp
+    debug('infering', exp)
     if IS(exp, Module):
         #print 'infering module', env
         return infer(exp.body, env, stk)
@@ -856,7 +860,7 @@ def infer(exp, env, stk):
     elif IS(exp, Name):
         #print "Name:" + str(exp), 'ID:', exp.id
         b = lookup(exp.id, env)
-        #print b
+        debug('infering name:', b, env)
         if (b <> None):
             putInfo(exp, b)
             return b
@@ -891,7 +895,7 @@ def infer(exp, env, stk):
             # find attr name in object and return it
             for o in filter(lambda obj: IS(obj, ObjType), t):
                 if exp.attr in o.attrs:
-                    attribs.append(AttrType(o.attrs[exp.attr], o))
+                    attribs.append(AttrType(o.attrs[exp.attr], o, exp.value))
                 else:
                     attribs.append(TypeError('no such attribute', exp.attr))
             return attribs
@@ -912,6 +916,9 @@ def infer(exp, env, stk):
     #         t = infer(e, env, stk)
     #         eltTypes.append(t)
     #     return [Bind(TupleType(eltTypes), exp)]
+
+    elif IS(exp, ObjType):
+        return exp
 
     else:
         return [UnknownType()]
@@ -953,7 +960,7 @@ def checkExp(exp):
         debug("---------------------------- history ----------------------------")
         for k in sorted(history.keys(), key=nodekey):
             debug(k, ":", history[k])
-        print("\n")
+        debug("\n")
 
 
 # check a string
@@ -1025,6 +1032,8 @@ def printAst(node):
         ret = "fun:" + str(node.name)
     elif (IS(node, ClassDef)):
         ret = "class:" + str(node.name)
+    elif (IS(node, Attribute)):
+        ret = "attribute:" + str(node.value) + "." + str(node.attr)
     elif (IS(node, Call)):
         ret = ("call:" + str(node.func)
                + ":(" + printList(node.args) + ")")
