@@ -12,6 +12,8 @@ from functools import partial
 
 logging.basicConfig(filename="pysonar.log", level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.WARN)
+
 
 def _log(fn, *args):
     fn(' '.join(map(str, args)))
@@ -124,14 +126,30 @@ class PrimType(Type):
 
 
 class ClassType(Type):
-    def __init__(self, name, body, env):
+    def __init__(self, name, bases, body, env):
         #print "ClassType Body", body
         self.name = name
         self.env = env
         self.classattrs = {}
+        for base in bases:
+            if IS(base, Attribute):
+                continue
+            if base.id == 'object':
+                continue
+            baseClasses = lookup(base.id, env)
+            if baseClasses and len(baseClasses) == 1: # limit to one possible type
+                baseClass = baseClasses[0]
+                for key,val in baseClass.classattrs.iteritems():
+                    self.classattrs[key] = val
+            else:
+                logger.error('Can\'t infer base of %s: %s %s' % (name, baseClasses, base.id))
+        self.__saveClassAttrs(body)
+
+    def __saveClassAttrs(self, body):
         for classattr in body:
             if IS(classattr, FunctionDef):
                 self.classattrs[classattr.name] = classattr
+
     def __repr__(self):
         return "class:" + self.name
     def __eq__(self, other):
@@ -450,6 +468,11 @@ def invoke1(call, clo, env, stk):
     if IS(clo, AttrType):
         saveMethodInvocationInfo(call, clo, env)
         attr = clo
+
+        # add self to function call args
+        if attr.obj.classtype.name != 'module':
+            call.args.insert(0, attr.obj)
+
         # invoking attribute
         debug('invoking method', attr.clo.func.name, 'with args', call.args)
         env = attr.obj.classtype.env
@@ -717,7 +740,7 @@ def inferSeq(exp, env, stk):
             _, module_env = inferSeq(module.body, env1, nil)
             #module_env = close(module.body, nil)
             name_import_as = module_name.asname or module_name.name
-            module_class = ClassType('module', module.body, module_env)
+            module_class = ClassType('module', [], module.body, module_env)
             module_obj = [ObjType(module_class, [], env)]  # probably env is not needed here
             env = append(Pair(Pair(name_import_as, module_obj), nil), env)
         return inferSeq(exp[1:], env, stk)
@@ -853,7 +876,7 @@ def infer(exp, env, stk):
         return invoke(exp, env, stk)
 
     elif IS(exp, ClassDef):
-        c = ClassType(exp.name, exp.body, env)
+        c = ClassType(exp.name, exp.bases, exp.body, env)
         return [c]
 
     elif IS(exp, Attribute):
