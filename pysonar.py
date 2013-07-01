@@ -7,6 +7,8 @@ from ast import *
 from lists import *
 from collections import defaultdict
 import os
+import logging
+logger = logging.getLogger(__name__)
 
 ####################################################################
 ## global parameters
@@ -426,19 +428,19 @@ def invoke1(call, clo, env, stk):
         putInfo(call, err)
         return [err]
     if IS(clo, ClassType):
-        print 'creating instance of', clo
+        logger.debug('creating instance of', clo)
         ctorargs = map(lambda arg: infer(arg, env, stk), call.args)
         return [ObjType(clo, ctorargs, clo.env)]
     if IS(clo, AttrType):
         saveMethodInvocationInfo(call, clo, env)
         attr = clo
         # invoking attribute
-        print 'invoking method', attr.clo.func.name, 'with args', call.args
+        logger.debug('invoking method', attr.clo.func.name, 'with args', call.args)
         env = attr.obj.classtype.env
         return invoke1(call, attr.clo, env, stk)
         # return [clo.clo]
 
-    print 'invoking closure', clo.func, 'with args', call.args
+    logger.debug('invoking closure', clo.func, 'with args', call.args)
 
     func = clo.func
     fenv = clo.env
@@ -529,7 +531,7 @@ def invoke(call, env, stk):
         t = invoke1(call, clo, env, stk)
         totypes = totypes + t
     # infer arguments even if we don't know which method it is
-    print 'in case of unknown object, infering arguments', call.args
+    logger.debug('in case of unknown object, infering arguments', call.args)
     for arg in call.args:
         infer(arg, env, stk)
     return totypes
@@ -656,7 +658,7 @@ def inferSeq(exp, env, stk):
         #print 'infering', e, env
         cs = lookup(e.name, env)
         if not cs:
-            print 'Function %s not found in scope %s' % (e.name, env)
+            logger.debug('Function %s not found in scope %s' % (e.name, env))
         for c in cs:
             c.env = env                          # create circular env to support recursion
         for d in e.args.defaults:                # infer types for default arguments
@@ -929,7 +931,7 @@ def getModuleExp(modulename):
         s = f.read()
         f.close()
     except IOError, e:
-        print e
+        logger.error(e)
         return parse('')
     return parse(s)
 
