@@ -919,9 +919,9 @@ def checkExp(exp):
     clear()
     ret = infer(exp, nil, nil)
     if history.keys() <> [] and logger.isEnabledFor(logging.DEBUG):
-        print "---------------------------- history ----------------------------"
+        debug("---------------------------- history ----------------------------")
         for k in sorted(history.keys(), key=nodekey):
-            print(k, ":", history[k])
+            debug(k, ":", history[k])
         print("\n")
 
 
