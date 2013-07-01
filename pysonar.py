@@ -8,13 +8,29 @@ from lists import *
 from collections import defaultdict
 import os
 import logging
+from functools import partial
+
+logging.basicConfig(filename="pysonar.log", level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+def _log(fn, *args):
+    fn(' '.join(map(str, args)))
+
+debug = partial(_log, logger.debug)
+warn = partial(_log, logger.warn)
+
 
 ####################################################################
 ## global parameters
 ####################################################################
 IS = isinstance
 
+# dict[str, list]
+# objectstateholder -> list[tuple[
+#                               list[initializator parameters],
+#                               list[call arguments],
+#                               ENV
+#                       ]]
 MYDICT = defaultdict(list)
 PYTHONPATH = []
 
@@ -428,19 +444,19 @@ def invoke1(call, clo, env, stk):
         putInfo(call, err)
         return [err]
     if IS(clo, ClassType):
-        logger.debug('creating instance of', clo)
+        debug('creating instance of', clo)
         ctorargs = map(lambda arg: infer(arg, env, stk), call.args)
         return [ObjType(clo, ctorargs, clo.env)]
     if IS(clo, AttrType):
         saveMethodInvocationInfo(call, clo, env)
         attr = clo
         # invoking attribute
-        logger.debug('invoking method', attr.clo.func.name, 'with args', call.args)
+        debug('invoking method', attr.clo.func.name, 'with args', call.args)
         env = attr.obj.classtype.env
         return invoke1(call, attr.clo, env, stk)
         # return [clo.clo]
 
-    logger.debug('invoking closure', clo.func, 'with args', call.args)
+    debug('invoking closure', clo.func, 'with args', call.args)
 
     func = clo.func
     fenv = clo.env
@@ -531,7 +547,7 @@ def invoke(call, env, stk):
         t = invoke1(call, clo, env, stk)
         totypes = totypes + t
     # infer arguments even if we don't know which method it is
-    logger.debug('in case of unknown object, infering arguments', call.args)
+    debug('in case of unknown object, infering arguments', call.args)
     for arg in call.args:
         infer(arg, env, stk)
     return totypes
@@ -658,7 +674,7 @@ def inferSeq(exp, env, stk):
         #print 'infering', e, env
         cs = lookup(e.name, env)
         if not cs:
-            logger.debug('Function %s not found in scope %s' % (e.name, env))
+            debug('Function %s not found in scope %s' % (e.name, env))
         for c in cs:
             c.env = env                          # create circular env to support recursion
         for d in e.args.defaults:                # infer types for default arguments
@@ -902,7 +918,7 @@ def nodekey(node):
 def checkExp(exp):
     clear()
     ret = infer(exp, nil, nil)
-    if history.keys() <> []:
+    if history.keys() <> [] and logger.isEnabledFor(logging.DEBUG):
         print "---------------------------- history ----------------------------"
         for k in sorted(history.keys(), key=nodekey):
             print(k, ":", history[k])
@@ -931,7 +947,7 @@ def getModuleExp(modulename):
         s = f.read()
         f.close()
     except IOError, e:
-        logger.error(e)
+        warn(str(e))
         return parse('')
     return parse(s)
 
