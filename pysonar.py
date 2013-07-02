@@ -479,7 +479,7 @@ def invoke1(call, clo, env, stk):
 
         debug('invoking method', attr.clo.func.name, 'with args', call.args)
         return invokeClosure(call, actualParams, attr.clo, env, stk)
-    invokeClosure(call, call.args, clo, env, stk)
+    return invokeClosure(call, call.args, clo, env, stk)
 
 
 def invokeClosure(call, actualParams, clo, env, stk):
