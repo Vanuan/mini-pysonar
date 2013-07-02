@@ -930,6 +930,11 @@ def clear():
     nUnknown = 0
 
 
+def cleanState():
+    clear()
+    MYDICT.clear()
+
+
 def nodekey(node):
     if hasattr(node, 'lineno'):
         return node.lineno
