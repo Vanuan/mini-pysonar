@@ -10,7 +10,7 @@ import os
 import logging
 from functools import partial
 
-logging.basicConfig(filename="pysonar.log", level=logging.DEBUG)
+logging.basicConfig(filename="pysonar.log", level=logging.WARN)
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.WARN)
 
