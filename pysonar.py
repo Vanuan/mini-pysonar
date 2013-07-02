@@ -28,9 +28,9 @@ warn = partial(_log, logger.warn)
 IS = isinstance
 
 # dict[str, list]
-# objectstateholder -> list[tuple[
-#                               list[initializator parameters],
-#                               list[call arguments],
+# class/type name       -> list[tuple[
+#                               list[list[initializator arguments]],
+#                               list[list[call arguments]],
 #                               ENV
 #                       ]]
 MYDICT = defaultdict(list)
@@ -439,11 +439,10 @@ def onStack(call, args, stk):
     return False
 
 
-def saveMethodInvocationInfo(call, clo, env):
+def saveMethodInvocationInfo(call, clo, env, stk):
     if call.args:
-        ctorargs = tuple(map(lambda a: a, clo.obj.ctorargs))
-        callargs = tuple(map(lambda a: a, call.args))
-        #callargs = map(lambda arg: infer(arg, env, stk), call.args)
+        ctorargs = list(map(lambda a: a, clo.obj.ctorargs))
+        callargs = map(lambda arg: infer(arg, env, stk), call.args)
         MYDICT[clo.obj.classtype.name].append((ctorargs, callargs, env))
 
 def getMethodInvocationInfo():
@@ -457,6 +456,9 @@ def invoke1(call, clo, env, stk):
     # Even if operator is not a closure, resolve the
     # arguments for partial information.
     if not IS(clo, Closure) and not IS(clo, ClassType) and not IS(clo, AttrType):
+        # infer arguments even if it is not callable
+        # (we don't know which method it is)
+        debug('Unknown function or method, infering arguments', call.args)
         for a in call.args:
             t1 = infer(a, env, stk)
         for k in call.keywords:
@@ -475,7 +477,7 @@ def invoke1(call, clo, env, stk):
         # TODO: @staticmethod, @classmethod
         if attr.obj.classtype.name != 'module':
             actualParams.insert(0, attr.objT)  # this is bad, I'm modifying AST! 
-        saveMethodInvocationInfo(call, clo, env)
+        saveMethodInvocationInfo(call, clo, env, stk)
 
         debug('invoking method', attr.clo.func.name, 'with args', call.args)
         return invokeClosure(call, actualParams, attr.clo, env, stk)
@@ -574,10 +576,6 @@ def invoke(call, env, stk):
     for clo in clos:
         t = invoke1(call, clo, env, stk)
         totypes = totypes + t
-    # infer arguments even if we don't know which method it is
-    debug('in case of unknown object, infering arguments', call.args)
-    for arg in call.args:
-        infer(arg, env, stk)
     return totypes
 
 
@@ -893,7 +891,10 @@ def infer(exp, env, stk):
         if t:
             attribs = []
             # find attr name in object and return it
-            for o in filter(lambda obj: IS(obj, ObjType), t):
+            for o in t:
+                if not IS(o, ObjType):
+                    attribs.append(TypeError('unknown object', o))
+                    continue
                 if exp.attr in o.attrs:
                     attribs.append(AttrType(o.attrs[exp.attr], o, exp.value))
                 else:
