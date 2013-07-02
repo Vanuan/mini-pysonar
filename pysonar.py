@@ -513,7 +513,7 @@ def invoke1(call, clo, env, stk):
         tloc1 = lookup(k.arg, pos)
         if tloc1 <> None:
             putInfo(call, TypeError('multiple values for keyword argument',
-                                     k.arg, loc))
+                                     k.arg, tloc1))
         elif k.arg not in ids:
             kwarg = bind(k.arg, ts, kwarg)
         else:
