@@ -49,15 +49,13 @@ def iter_fields(node):
             pass
 
 # for debugging
-def sz(s):
-    return nodeSize(parse(s), True)
 
 def dp(s):
     return map(dump, parse(s).body)
 
-def pf(file):
+def pf(file_):
     import cProfile
-    cProfile.run("sonar(" + file + ")", sort="cumulative")
+    cProfile.run("sonar(" + file_ + ")", sort="cumulative")
 
 
 
