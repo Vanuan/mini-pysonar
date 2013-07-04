@@ -442,6 +442,7 @@ def bind(target, value, env):
     elif IS(target, ast.Subscript):
         error("Syntax error: Subscript type is not supported in assignment: ",
               target)
+        return env
     else:
         putInfo(target, SyntaxError("not assignable"))
         return env
