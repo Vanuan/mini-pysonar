@@ -830,6 +830,9 @@ def inferSeq(exp, env, stk):
     elif IS(e, Print):
         return inferSeq(exp[1:], env, stk)
 
+    elif IS(e, Assert):
+        return inferSeq(exp[1:], env, stk)
+
     elif IS(e, Global):
         # TODO this should affect bind behaviour when assigning
         # We don't have a way to change env for now,
@@ -1081,6 +1084,8 @@ def printAst(node):
         ret = "pass"
     elif IS(node, Global):
         ret = "global:" + str(node.names)
+    elif IS(node, Assert):
+        ret = "assert " + str(node.test)
     elif IS(node,list):
         ret = printList(node)
     else:
