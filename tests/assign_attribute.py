@@ -11,11 +11,26 @@ TheClass.class_level_method = m()
 
 class A():
     def m(self, a):
-        pass
+        return a
+    
+    
+class X():
+    pass
+
+class Z():
+    pass
+
+z = Z()
     
 a = A()
 a.m(TheClass.class_level_attr)
 a.m(TheClass.class_level_method)
+
+a.b = X()
+a.b.c = z
+
+a.m(a.b)
+a.m(a.b.c)
 
 li = [1, 2, 3]
 li[0] = 5
