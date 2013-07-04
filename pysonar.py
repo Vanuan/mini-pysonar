@@ -204,18 +204,28 @@ class FuncType(Type):
 
 
 class AttrType(Type):
+    '''
+    Describes method in class
+    '''
     def __init__(self, closure, o, objT):
+        '''@types: Closure or list[Closure], ObjType, ast.AST
+        @param: objT is a value of ast.Attribute
+        '''
         # self.env = closure.env
         self.clo = closure
         self.obj = o
         self.objT = objT
+
     def __repr__(self):
-        return str(self.clo)
+        clo_repr = ','.join(map(str, IS(self.clo, list) and self.clo or (self.clo,)))
+        return '(attr "%s", "%s")' % (self.obj, clo_repr)
+
     def __eq__(self, other):
         if IS(other, FuncType):
             return (self.clo == other.clo)
         else:
             return False
+
     def __ne__(self, other):
         return not self.__eq__(other)
 
@@ -406,17 +416,19 @@ def getId(x):
         return x
 
 
-def bind(target, value, env):
+def bind(target, infered_value, env):
     if IS(target, Name) or IS(target, str):
-        u = value
+        u = infered_value
         putInfo(target, u)
         return ext(getId(target), u, env)
     elif IS(target, Attribute):
         ast_name = target.value
-        target_objs = lookup(ast_name.id, env)
-        for obj in target_objs or ():
+        infered_targets = infer(ast_name, env, nil)
+        for obj in infered_targets:
             if IS(obj, (ClassType, ObjType)):
-                obj.attrs[target.attr] = value
+                obj.attrs[target.attr] = infered_value
+            elif IS(obj, AttrType):
+                obj.obj.attrs[target.attr] = infered_value
             else:
                 error("Syntax error: wrong target type in assignment: ",
                       obj, type(obj))
@@ -424,19 +436,19 @@ def bind(target, value, env):
 
     # ignored for now
     # elif IS(target, Tuple) or IS(target, List):
-    #     if IS(value, TupleType) or IS(value, List):
-    #         if len(target.elts) == len(value.elts):
-    #             for i in xrange(len(value.elts)):
-    #                 env = bind(target.elts[i], value.elts[i], env)
+    #     if IS(infered_value, TupleType) or IS(infered_value, List):
+    #         if len(target.elts) == len(infered_value.elts):
+    #             for i in xrange(len(infered_value.elts)):
+    #                 env = bind(target.elts[i], infered_value.elts[i], env)
     #             return env
-    #         elif len(target.elts) < len(value.elts):
+    #         elif len(target.elts) < len(infered_value.elts):
     #             putInfo(target, ValueError('too many values to unpack'))
     #             return env
     #         else:
     #             putInfo(target, ValueError('too few values to unpack'))
     #             return env
     #     else:
-    #         putInfo(value, TypeError('non-iterable object'))
+    #         putInfo(infered_value, TypeError('non-iterable object'))
     #         return env
 
     elif IS(target, ast.Subscript):
@@ -880,6 +892,7 @@ def inferSeq(exp, env, stk):
 
 # main type inferencer
 def infer(exp, env, stk):
+    '@types: ast.AST|object, Pair, Pair -> list[Type]'
     debug('infering', exp)
     if IS(exp, Module):
         #print 'infering module', env
@@ -1005,6 +1018,7 @@ def checkExp(exp):
         for k in sorted(history.keys(), key=nodekey):
             debug(k, ":", history[k])
         debug("\n")
+    return ret
 
 
 # check a string
@@ -1015,7 +1029,7 @@ def checkString(s):
 # check a file
 def checkFile(filename):
     f = open(filename, 'r');
-    checkString(f.read())
+    return checkString(f.read())
 
 
 def getModuleExp(modulename):
