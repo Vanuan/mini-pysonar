@@ -205,7 +205,8 @@ class FuncType(Type):
 
 class AttrType(Type):
     '''
-    Describes method in class
+    Reference on object attribute value, so binds object with this value while
+    name is determined in the context (or environment)
     '''
     def __init__(self, closure, o, objT):
         '''@types: Closure or list[Closure], ObjType, ast.AST
@@ -470,6 +471,9 @@ def onStack(call, args, stk):
 
 
 def saveMethodInvocationInfo(call, clo, env, stk):
+    '''
+    @types: ast.Call, ObjType, Pair, Pair -> None
+    '''
     if call.args:
         ctorargs = list(map(lambda a: a, clo.obj.ctorargs))
         callargs = map(lambda arg: infer(arg, env, stk), call.args)
@@ -480,13 +484,15 @@ def getMethodInvocationInfo():
 
 # invoke one closure
 def invoke1(call, clo, env, stk):
-    '@types: ast.Call, Closure, Pair, Pair -> ast.AST or Type'
+    '''@types: ast.Call, AttrType Or Closure, Pair, Pair -> ast.AST or Type
+    @param clo: is actually just a callable
+    '''
     if (clo == bottomType):
         return [bottomType]
 
     # Even if operator is not a closure, resolve the
     # arguments for partial information.
-    if not IS(clo, Closure) and not IS(clo, ClassType) and not IS(clo, AttrType):
+    if not IS(clo, (Closure, ClassType, AttrType)):
         # infer arguments even if it is not callable
         # (we don't know which method it is)
         debug('Unknown function or method, infering arguments', call.args)
@@ -500,22 +506,44 @@ def invoke1(call, clo, env, stk):
     if IS(clo, ClassType):
         debug('creating instance of', clo)
         ctorargs = map(lambda arg: infer(arg, env, stk), call.args)
-        return [ObjType(clo, ctorargs, clo.env)]
+        obj = ObjType(clo, ctorargs, clo.env)
+        init_closure = obj.attrs.get('__init__')
+        if init_closure:
+            self_arg = get_self_arg_name(init_closure.func)
+            ref_to_init = AttrType(init_closure, obj, self_arg)
+            init_env = ext(self_arg.id, [obj], env)
+            invoke1(call, ref_to_init, init_env, stk)
+        return [obj]
     if IS(clo, AttrType):
         attr = clo
         # add self to function call args
         actualParams = list(call.args)
         # TODO: @staticmethod, @classmethod
         if attr.obj.classtype.name != 'module':
-            actualParams.insert(0, attr.objT)  # this is bad, I'm modifying AST! 
+            actualParams.insert(0, attr.objT) 
         saveMethodInvocationInfo(call, clo, env, stk)
 
         debug('invoking method', attr.clo.func.name, 'with args', call.args)
         return invokeClosure(call, actualParams, attr.clo, env, stk)
     return invokeClosure(call, call.args, clo, env, stk)
 
+def get_self_arg_name(fn_def):
+    ''' Expecting to get ast.Name with id, for instance, self
+    @types: ast.FunctionDef -> ast.Name
+    '''
+    if not fn_def.args.args:
+        raise ValueError("Bound method has at least one parameter - self")
+    arg = fn_def.args.args[0]
+    if IS(arg, ast.Name):
+        return arg
+    msg = "Method definition %s doesn't have self as first argument"
+    raise ValueError(msg % fn_def.name)
+
 
 def invokeClosure(call, actualParams, clo, env, stk):
+    '''
+    @types: ast.Call, list[ast.AST], Closure, Pair, Pair -> list[Type]
+    '''
     debug('invoking closure', clo.func, 'with args', actualParams)
     debug(clo.func.body)
 
