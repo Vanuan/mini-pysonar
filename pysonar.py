@@ -477,6 +477,7 @@ def saveMethodInvocationInfo(call, clo, env, stk):
     if call.args:
         ctorargs = list(map(lambda a: a, clo.obj.ctorargs))
         callargs = map(lambda arg: infer(arg, env, stk), call.args)
+        # TODO save keywords
         MYDICT[clo.obj.classtype.name].append((ctorargs, callargs, env))
 
 def getMethodInvocationInfo():
@@ -520,7 +521,7 @@ def invoke1(call, clo, env, stk):
         actualParams = list(call.args)
         # TODO: @staticmethod, @classmethod
         if attr.obj.classtype.name != 'module':
-            actualParams.insert(0, attr.objT) 
+            actualParams.insert(0, attr.objT)
         saveMethodInvocationInfo(call, clo, env, stk)
 
         debug('invoking method', attr.clo.func.name, 'with args', call.args)
@@ -586,15 +587,16 @@ def invokeClosure(call, actualParams, clo, env, stk):
             pos = bind(k.arg, ts, pos)
 
     # put extras in kwarg or report them
+    # bind call.keywords to func.args.kwarg
     if kwarg <> nil:
         if func.args.kwarg <> None:
             pos = bind(func.args.kwarg,
-                       DictType(reverse(kwarg)),
+                       [DictType(reverse(kwarg))],
                        pos)
         else:
             putInfo(call, TypeError("unexpected keyword arguements", kwarg))
     elif func.args.kwarg <> None:
-        pos = bind(func.args.kwarg, DictType(nil), pos)
+        pos = bind(func.args.kwarg, [DictType(nil)], pos)
 
     # bind defaults, avoid overwriting bound vars
     # types for defaults are already inferred when the function was defined
