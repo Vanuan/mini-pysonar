@@ -865,6 +865,7 @@ def inferSeq(exp, env, stk):
         # We don't have a way to change env for now,
         # we can only append
         # see tests/assign.py
+        return inferSeq(exp[1:], env, stk)
     elif IS(e, ast.Delete):
         return inferSeq(exp[1:], env, stk)
     
