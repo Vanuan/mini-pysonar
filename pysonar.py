@@ -830,6 +830,15 @@ def inferSeq(exp, env, stk):
     elif IS(e, Print):
         return inferSeq(exp[1:], env, stk)
 
+    elif IS(e, With):
+        # TODO infer e.context_expr,
+        # call __enter__ from e.context_expr
+        # bind e.optional_vars to the result of __enter__
+        # call __exit__
+        (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
+        (t2, env2) = inferSeq(exp[1:], env1, stk)
+        return (union([t1, t2]), env2)
+
     elif IS(e, Assert):
         return inferSeq(exp[1:], env, stk)
 
