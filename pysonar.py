@@ -1,8 +1,8 @@
 # pysonar.py - a Python version of PySonar static analyzer for Python
 # Copyright (C) 2011 Yin Wang (yinwang0@gmail.com)
-
 import sys
 import re
+import ast
 from ast import *
 from lists import *
 from collections import defaultdict
@@ -20,6 +20,9 @@ def _log(fn, *args):
 
 debug = partial(_log, logger.debug)
 warn = partial(_log, logger.warn)
+error = partial(_log, logger.error)
+
+
 
 
 ####################################################################
@@ -128,7 +131,7 @@ class ClassType(Type):
         #print "ClassType Body", body
         self.name = name
         self.env = env
-        self.classattrs = {}
+        self.attrs = {}
         for base in bases:
             if IS(base, Attribute):
                 continue
@@ -138,8 +141,8 @@ class ClassType(Type):
             if (baseClasses and len(baseClasses) == 1
                 and IS(baseClasses[0], ClassType)): # limit to one possible type
                 baseClass = baseClasses[0]
-                for key,val in baseClass.classattrs.iteritems():
-                    self.classattrs[key] = val
+                for key,val in baseClass.attrs.iteritems():
+                    self.attrs[key] = val
             else:
                 logger.error('Can\'t infer base of %s: %s %s' % (name, baseClasses, base.id))
         self.__saveClassAttrs(body)
@@ -147,7 +150,7 @@ class ClassType(Type):
     def __saveClassAttrs(self, body):
         for classattr in body:
             if IS(classattr, FunctionDef):
-                self.classattrs[classattr.name] = classattr
+                self.attrs[classattr.name] = classattr
 
     def __repr__(self):
         return "class:" + self.name
@@ -162,9 +165,10 @@ class ClassType(Type):
 
 class ObjType(Type):
     def __init__(self, classtype, ctorargs, env):
+        '@types: ClassType, list[Type], Pair'
         self.classtype = classtype
         self.attrs = {}
-        for name, attr in self.classtype.classattrs.iteritems():
+        for name, attr in self.classtype.attrs.iteritems():
             self.attrs[name] = Closure(attr, classtype.env)
         self.ctorargs = ctorargs
 
@@ -218,6 +222,7 @@ class AttrType(Type):
 
 class Closure(Type):
     def __init__(self, func, env):
+        '@types: ast.FunctionDef, Pair'
         self.func = func
         self.env = env
         self.defaults = []
@@ -406,6 +411,16 @@ def bind(target, value, env):
         u = value
         putInfo(target, u)
         return ext(getId(target), u, env)
+    elif IS(target, Attribute):
+        ast_name = target.value
+        target_objs = lookup(ast_name.id, env)
+        for obj in target_objs or ():
+            if IS(obj, (ClassType, ObjType)):
+                obj.attrs[target.attr] = value
+            else:
+                error("Syntax error: wrong target type in assignment: ",
+                      obj, type(obj))
+        return env
 
     # ignored for now
     # elif IS(target, Tuple) or IS(target, List):
@@ -423,6 +438,10 @@ def bind(target, value, env):
     #     else:
     #         putInfo(value, TypeError('non-iterable object'))
     #         return env
+
+    elif IS(target, ast.Subscript):
+        error("Syntax error: Subscript type is not supported in assignment: ",
+              target)
     else:
         putInfo(target, SyntaxError("not assignable"))
         return env
@@ -448,6 +467,7 @@ def getMethodInvocationInfo():
 
 # invoke one closure
 def invoke1(call, clo, env, stk):
+    '@types: ast.Call, Closure, Pair, Pair -> ast.AST or Type'
     if (clo == bottomType):
         return [bottomType]
 
@@ -845,6 +865,10 @@ def inferSeq(exp, env, stk):
         # We don't have a way to change env for now,
         # we can only append
         # see tests/assign.py
+    elif IS(e, ast.Delete):
+        return inferSeq(exp[1:], env, stk)
+    
+    elif IS(e, ast.Subscript):
         return inferSeq(exp[1:], env, stk)
 
     else:
@@ -909,7 +933,7 @@ def infer(exp, env, stk):
             attribs = []
             # find attr name in object and return it
             for o in t:
-                if not IS(o, ObjType):
+                if not IS(o, (ObjType, ClassType)):
                     attribs.append(TypeError('unknown object', o))
                     continue
                 if exp.attr in o.attrs:
