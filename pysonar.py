@@ -10,7 +10,7 @@ import os
 import logging
 from functools import partial
 
-logging.basicConfig(filename="_pysonar.log", level=logging.WARN)
+logging.basicConfig(filename="_pysonar.log", level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.WARN)
 
@@ -830,6 +830,13 @@ def inferSeq(exp, env, stk):
     elif IS(e, Print):
         return inferSeq(exp[1:], env, stk)
 
+    elif IS(e, Global):
+        # TODO this should affect bind behaviour when assigning
+        # We don't have a way to change env for now,
+        # we can only append
+        # see tests/assign.py
+        return inferSeq(exp[1:], env, stk)
+
     else:
         raise TypeError('recognized node in effect context', e)
 
@@ -1072,6 +1079,8 @@ def printAst(node):
         ret = '+'
     elif (IS(node, Pass)):
         ret = "pass"
+    elif IS(node, Global):
+        ret = "global:" + str(node.names)
     elif IS(node,list):
         ret = printList(node)
     else:
