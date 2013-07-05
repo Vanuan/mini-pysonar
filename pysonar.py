@@ -535,8 +535,11 @@ def invoke1(call, clo, env, stk):
         for closure in IS(attr.clo, list) and attr.clo or (attr.clo,):
             if IS(closure, Closure):
                 #debug('invoking method', closure, 'with args', call.args)
+                # Create new env for method
+                # On each call ClassType.env might be different
+                new_closure = Closure(closure.func, classtype.env)
                 debug('invoking method', closure.func.name, 'with args', call.args)
-                types.extend(invokeClosure(call, actualParams, attr.clo, env, stk))
+                types.extend(invokeClosure(call, actualParams, new_closure, env, stk))
             elif IS(closure, ClassType):
                 types.extend(invoke1(call, closure, env, stk))
             else:
@@ -831,9 +834,15 @@ def inferSeq(exp, env, stk):
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, ClassDef):
-        t1 = infer(e, env, stk)
-        classPair = append(Pair(e.name, nil), t1)
-        env = append(env, Pair(classPair, nil))
+        cs = lookup(e.name, env)
+        if not cs:
+            debug('Class def %s not found in scope %s' % (e.name, env))
+        for c in cs:
+            c.env = env
+
+        #t1 = cs #infer(e, env, stk)
+        #classPair = append(Pair(e.name, nil), t1)
+        #env = append(env, Pair(classPair, nil))
         (t2, env2) = inferSeq(exp[1:], env, stk)
         return (t2, env2)
 
@@ -981,10 +990,6 @@ def infer(exp, env, stk):
 
     elif IS(exp, Call):
         return invoke(exp, env, stk)
-
-    elif IS(exp, ClassDef):
-        c = ClassType(exp.name, exp.bases, exp.body, env)
-        return [c]
 
     elif IS(exp, Attribute):
         #print 'Attribute:', exp.value, exp.attr
