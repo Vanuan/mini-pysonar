@@ -150,7 +150,9 @@ class ClassType(Type):
     def __saveClassAttrs(self, body):
         for classattr in body:
             if IS(classattr, FunctionDef):
-                self.attrs[classattr.name] = classattr
+                # TODO here we really want a special env, that will include
+                # only variables accessible in function's body
+                self.attrs[classattr.name] = Closure(classattr, self.env)
 
     def __repr__(self):
         return "class:" + self.name
@@ -168,8 +170,9 @@ class ObjType(Type):
         '@types: ClassType, list[Type], Pair'
         self.classtype = classtype
         self.attrs = {}
+        # copy class attributes over to instance
         for name, attr in self.classtype.attrs.iteritems():
-            self.attrs[name] = Closure(attr, classtype.env)
+            self.attrs[name] = attr
         self.ctorargs = ctorargs
 
     def __repr__(self):
@@ -519,10 +522,16 @@ def invoke1(call, clo, env, stk):
         attr = clo
         # add self to function call args
         actualParams = list(call.args)
+        if IS(attr.obj, ObjType):
+            classtype = attr.obj.classtype
+            saveMethodInvocationInfo(call, clo, env, stk)
+        else:
+            err = TypeError('AttrType object is not an object', clo)
+            putInfo(call, err)
+            return [err]
         # TODO: @staticmethod, @classmethod
-        if attr.obj.classtype.name != 'module':
+        if classtype.name != 'module':
             actualParams.insert(0, attr.objT)
-        saveMethodInvocationInfo(call, clo, env, stk)
 
         debug('invoking method', attr.clo.func.name, 'with args', call.args)
         return invokeClosure(call, actualParams, attr.clo, env, stk)
@@ -814,10 +823,7 @@ def inferSeq(exp, env, stk):
     elif IS(e, ClassDef):
         t1 = infer(e, env, stk)
         classPair = append(Pair(e.name, nil), t1)
-        #print 'classPair', classPair
-        #print 'env:', env
         env = append(env, Pair(classPair, nil))
-        #return [ClassType(exp.name)]
         (t2, env2) = inferSeq(exp[1:], env, stk)
         return (t2, env2)
 
