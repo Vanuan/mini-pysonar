@@ -526,7 +526,7 @@ def invoke1(call, clo, env, stk):
             return [err]
         # add self to function call args
         actualParams = list(call.args)
-            classtype = attr.obj.classtype
+        classtype = attr.obj.classtype
         saveMethodInvocationInfo(call, attr, env, stk)
         # TODO: @staticmethod, @classmethod
         if classtype.name != 'module':
