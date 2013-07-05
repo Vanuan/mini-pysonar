@@ -659,10 +659,10 @@ def invoke(call, env, stk):
 
 
 
-# pre-bind names to functions in sequences (should add classes later)
-def close(ls, env):
-    '@types: list[ast.AST], Pair -> Pair'
-    for e in ls:
+# pre-bind names to functions in sequences 
+def close(code_block, env):
+    '''@types: list[ast.AST], Pair -> Pair'''
+    for e in code_block:
         if IS(e, FunctionDef):
             c = Closure(e, nil)
             env = ext(e.name, [c], env)

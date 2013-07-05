@@ -14,13 +14,10 @@ class _DummyTest(TestCase):
     def runTest(self):
         pass
     
-dummyTest = _DummyTest()
-
-
 def as_unit(fn):
     @functools.wraps(fn)
     def wrapper():
-        return fn(dummyTest)
+        return fn(_DummyTest())
     return wrapper
 
 
@@ -123,7 +120,8 @@ class WithInit:
         return WithInit(3, 42);
         
     def knows_about_fn_from_module(self):
-        return module_fn()
+        y = module_fn()
+        return y
         
  
 with_init = WithInit(1, 2)
@@ -132,7 +130,7 @@ with_init.z()
 def module_fn():
     return 20
     
-with_init.knows_about_fn_from_module()
+result_from_module_fn = with_init.knows_about_fn_from_module()
 '''
     ps.checkString(s)
  
@@ -150,6 +148,14 @@ with_init.knows_about_fn_from_module()
     Cls = cls[0]
     # assert class type 
     ut.assertEqual(Cls, with_init.classtype)
+    
+    
+    results = find_in_history('result_from_module_fn', ps)
+    ut.assertEqual(1, len(results))
+    result = results[0]
+    # assert class type 
+    ut.assertEqual(result, with_init.classtype)
+    
 
  
 @as_unit
