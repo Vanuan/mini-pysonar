@@ -661,10 +661,10 @@ def close(ls, env):
     '@types: list[ast.AST], Pair -> Pair'
     for e in ls:
         if IS(e, FunctionDef):
-            c = Closure(e, None)
+            c = Closure(e, nil)
             env = ext(e.name, [c], env)
         elif IS(e, ClassDef):
-            c = ClassType(e.name, e.bases, e.body, None)
+            c = ClassType(e.name, e.bases, e.body, nil)
             env = ext(e.name, [c], env)
     return env
 
