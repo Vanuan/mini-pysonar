@@ -3,29 +3,7 @@ Created on Jul 4, 2013
 
 '''
 import pysonar as ps
-import functools
-from unittest.case import TestCase
-import ast
-from pprint import pprint
-
-
-class _DummyTest(TestCase):
-
-    def runTest(self):
-        pass
-    
-def as_unit(fn):
-    @functools.wraps(fn)
-    def wrapper():
-        return fn(_DummyTest())
-    return wrapper
-
-
-def find_in_history(id_, ps):
-    for ast_node, value in ps.history.iteritems():
-        if (isinstance(ast_node, ast.Name)
-            and ast_node.id == id_):
-            return value
+from tasty import as_unit, find_in_history
 
 
 @as_unit
@@ -176,7 +154,6 @@ result = a.m(keyarg='100')
     ut.assertEquals('keyarg', result_as_pair.fst.fst)
     ut.assertEquals('100', result_as_pair.fst.snd[0].s)
     result_as_pair.fst
-    
 
 
 @as_unit
