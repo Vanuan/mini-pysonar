@@ -2,78 +2,194 @@
 Created on Jul 4, 2013
 
 '''
-import pysonar
+import pysonar as ps
+import functools
+from unittest.case import TestCase
+import ast
+from pprint import pprint
 
- 
-def test_bound_method_call():
+
+class _DummyTest(TestCase):
+
+    def runTest(self):
+        pass
+    
+dummyTest = _DummyTest()
+
+
+def as_unit(fn):
+    @functools.wraps(fn)
+    def wrapper():
+        return fn(dummyTest)
+    return wrapper
+
+
+def find_in_history(id_, ps):
+    for ast_node, value in ps.history.iteritems():
+        if (isinstance(ast_node, ast.Name)
+            and ast_node.id == id_):
+            return value
+
+
+@as_unit
+def test_bound_method_call_and_obj_new_attr_creation(ut):
     s = '''
 class B:
     def x(self, p):
-        x.p = p
+        self.p = p
+        return self
         
 new_b = B().x(2)
     '''
-    pysonar.checkString(s)
+    ps.checkString(s)
+
+    class_types = find_in_history('B', ps)
+    ut.assertEqual(1, len(class_types))
+    class_type = class_types[0]
+    ut.assertEqual('B', class_type.name)
+    ut.assertEqual(1, len(class_type.attrs))
     
+    clo = class_type.attrs.get('x')
+    ut.assertTrue(isinstance(clo, ps.Closure))
+    ut.assertEqual([], clo.defaults)
     
-def test_obj_initialized_without_explicit_init_call():
+    # assert new instance
+    values = find_in_history("new_b", ps)
+    ut.assertEqual(1, len(values))
+    new_b = values[0]
+    ut.assertTrue(isinstance(new_b, ps.ObjType))
+    ut.assertEqual(2, new_b.attrs.get("p")[0].n)
+
+    
+     
+@as_unit
+def test_obj_initialized_without_explicit_init_call(ut):
     s = '''
 class B:
     pass
-
+ 
 b = B()
 '''
-    pysonar.checkString(s)
-    
+    ps.checkString(s)
+    class_types = find_in_history('B', ps)
+    ut.assertEqual(1, len(class_types))
+    class_type = class_types[0]
+    ut.assertEqual('B', class_type.name)
+    ut.assertEqual(0, len(class_type.attrs))
+ 
 
-def _test_object_initialized_by_calling_class_obj_as_attribute():
+@as_unit
+def test_object_initialized_by_calling_class_obj_as_attribute(ut):
     s = '''
 class B:
     pass
-
+ 
 b = B()
 b.x = B
-
-# unsupported
-b.x()
+ 
+b_inst = b.x()
     '''
-    pysonar.checkString(s)
-    
-def test_simple_init_call_where_self_arg_required():
-    s = '''
+    ps.checkString(s)
 
-class WithInit:
+    b_insts = find_in_history('b_inst', ps)
+    ut.assertEqual(1, len(b_insts))
+    b_inst = b_insts[0]
     
+    # check count of attributes on new instance of B, must be x
+
+    # assert type of new instance
+    ut.assertTrue(isinstance(b_inst, ps.ObjType))
+    
+    # assert class of new instance
+    b_cls = find_in_history('B', ps)
+    ut.assertEqual(1, len(b_cls))
+    B = b_cls[0]
+    
+    # assert class type 
+    ut.assertEqual(B, b_inst.classtype)
+     
+     
+@as_unit
+def test_simple_init_call_where_self_arg_required(ut):
+    s = '''
+ 
+class WithInit:
+     
     def __init__(self, p, p2):
         self.p = p
         self.p1 = p2
+         
+    def z(self):
+        return WithInit(3, 42);
         
-    def x(self):
-        return WithInit.__init__(self, 3, 42);
-
+    def knows_about_fn_from_module(self):
+        return module_fn()
+        
+ 
 with_init = WithInit(1, 2)
-with_init.x()
+with_init.z()
+
+def module_fn():
+    return 20
+    
+with_init.knows_about_fn_from_module()
 '''
-    pysonar.checkString(s)
+    ps.checkString(s)
+ 
+    with_inits = find_in_history('with_init', ps)
+    ut.assertEqual(1, len(with_inits))
+    with_init = with_inits[0]
+    # assert type of new instance
+    ut.assertTrue(isinstance(with_init, ps.ObjType))
+    ut.assertEqual(5, len(with_init.attrs))
+    ut.assertEqual(1, with_init.attrs.get("p")[0].n)
+    ut.assertEqual(2, with_init.attrs.get("p1")[0].n)
+    # assert class type
+    cls = find_in_history('WithInit', ps)
+    ut.assertEqual(1, len(cls))
+    Cls = cls[0]
+    # assert class type 
+    ut.assertEqual(Cls, with_init.classtype)
 
-def test_simple_bound_call():
-    c = '''
-class A:
-    def m(self, x):
-        self.m = x
-
-a = A()
-new_value = a.m(10)
-    '''
-    pysonar.checkString(c)
-
-def test_bound_call_with_kwargs():
+ 
+@as_unit
+def test_bound_call_with_actual_kwargs_returned(ut):
     c = '''
 class A:
     def m(self, **kwargs):
-        pass
-
+        return kwargs
+ 
 a = A()
-a.m(keyarg='')
+result = a.m(keyarg='100')
     '''
-    pysonar.checkString(c)
+    ps.checkString(c)
+    results = find_in_history('result', ps)
+
+    ut.assertEqual(1, len(results))
+    result_as_pair = results[0].dic
+    ut.assertEquals('keyarg', result_as_pair.fst.fst)
+    ut.assertEquals('100', result_as_pair.fst.snd[0].s)
+    result_as_pair.fst
+    
+
+
+@as_unit
+def test_bound_call_with_actual_keywords_returned(ut):
+    c = '''
+class A:
+    def m(self, default_x=100, y=200):
+        return default_x, y
+ 
+a = A()
+result = a.m(100, 200)
+result2 = a.m(100, y=200)
+result3 = a.m(default_x=100)
+    '''
+    ps.checkString(c)
+    results = find_in_history('result', ps)
+
+#     ut.assertEqual(1, len(results))
+#     result_as_pair = results[0].dic
+#     ut.assertEquals('keyarg', result_as_pair.fst.fst)
+#     ut.assertEquals('100', result_as_pair.fst.snd[0].s)
+#     result_as_pair.fst

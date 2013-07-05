@@ -128,14 +128,13 @@ class PrimType(Type):
 
 class ClassType(Type):
     def __init__(self, name, bases, body, env):
+        '@types: str, list[ast.AST], list[ast.AST], Pair'
         #print "ClassType Body", body
         self.name = name
         self.env = env
         self.attrs = {}
         for base in bases:
-            if IS(base, Attribute):
-                continue
-            if base.id == 'object':
+            if IS(base, Attribute) or base.id == 'object':
                 continue
             baseClasses = lookup(base.id, env)
             if (baseClasses and len(baseClasses) == 1
@@ -156,11 +155,13 @@ class ClassType(Type):
 
     def __repr__(self):
         return "class:" + self.name
+
     def __eq__(self, other):
         if IS(other, ClassType):
             return self.name == other.name
         else:
             return False
+
     def __ne__(self, other):
         return not self.__eq__(other)
 
@@ -396,7 +397,7 @@ def inUnion(t, u):
 
 
 def removeType(t, u):
-    return filter(lambda x: x <> t, u)
+    return [x for x in u if x != t]
 
 
 # combine two environments, make unions when necessary
@@ -478,8 +479,8 @@ def saveMethodInvocationInfo(call, clo, env, stk):
     @types: ast.Call, ObjType, Pair, Pair -> None
     '''
     if call.args:
-        ctorargs = list(map(lambda a: a, clo.obj.ctorargs))
-        callargs = map(lambda arg: infer(arg, env, stk), call.args)
+        ctorargs = [a for a in clo.obj.ctorargs]
+        callargs = [infer(arg, env, stk) for arg in call.args]
         # TODO save keywords
         MYDICT[clo.obj.classtype.name].append((ctorargs, callargs, env))
 
@@ -488,8 +489,7 @@ def getMethodInvocationInfo():
 
 # invoke one closure
 def invoke1(call, clo, env, stk):
-    '''@types: ast.Call, AttrType Or Closure, Pair, Pair -> ast.AST or Type
-    @param clo: is actually just a callable
+    '''@types: ast.Call, Callable, Pair, Pair -> ast.AST or Type
     '''
     if (clo == bottomType):
         return [bottomType]
@@ -501,15 +501,15 @@ def invoke1(call, clo, env, stk):
         # (we don't know which method it is)
         debug('Unknown function or method, infering arguments', call.args)
         for a in call.args:
-            t1 = infer(a, env, stk)
+            infer(a, env, stk)
         for k in call.keywords:
-            t2 = infer(k.value, env, stk)
+            infer(k.value, env, stk)
         err = TypeError('calling non-callable', clo)
         putInfo(call, err)
         return [err]
     if IS(clo, ClassType):
         debug('creating instance of', clo)
-        ctorargs = map(lambda arg: infer(arg, env, stk), call.args)
+        ctorargs = [infer(arg, env, stk) for arg in call.args]
         obj = ObjType(clo, ctorargs, clo.env)
         init_closure = obj.attrs.get('__init__')
         if init_closure:
@@ -520,22 +520,30 @@ def invoke1(call, clo, env, stk):
         return [obj]
     if IS(clo, AttrType):
         attr = clo
-        # add self to function call args
-        actualParams = list(call.args)
-        if IS(attr.obj, ObjType):
-            classtype = attr.obj.classtype
-            saveMethodInvocationInfo(call, clo, env, stk)
-        else:
-            err = TypeError('AttrType object is not an object', clo)
+        if not IS(attr.obj, ObjType):
+            err = TypeError('AttrType object is not an object', attr)
             putInfo(call, err)
             return [err]
+        # add self to function call args
+        actualParams = list(call.args)
+            classtype = attr.obj.classtype
+        saveMethodInvocationInfo(call, attr, env, stk)
         # TODO: @staticmethod, @classmethod
         if classtype.name != 'module':
             actualParams.insert(0, attr.objT)
-
-        debug('invoking method', attr.clo.func.name, 'with args', call.args)
-        return invokeClosure(call, actualParams, attr.clo, env, stk)
+        types = []
+        for closure in IS(attr.clo, list) and attr.clo or (attr.clo,):
+            if IS(closure, Closure):
+                #debug('invoking method', closure, 'with args', call.args)
+                debug('invoking method', closure.func.name, 'with args', call.args)
+                types.extend(invokeClosure(call, actualParams, attr.clo, env, stk))
+            elif IS(closure, ClassType):
+                types.extend(invoke1(call, closure, env, stk))
+            else:
+                types.append(TypeError("Callable type %s is not supported" % closure))
+        return types
     return invokeClosure(call, call.args, clo, env, stk)
+
 
 def get_self_arg_name(fn_def):
     ''' Expecting to get ast.Name with id, for instance, self
@@ -599,9 +607,7 @@ def invokeClosure(call, actualParams, clo, env, stk):
     # bind call.keywords to func.args.kwarg
     if kwarg <> nil:
         if func.args.kwarg <> None:
-            pos = bind(func.args.kwarg,
-                       [DictType(reverse(kwarg))],
-                       pos)
+            pos = bind(func.args.kwarg, [DictType(reverse(kwarg))], pos)
         else:
             putInfo(call, TypeError("unexpected keyword arguements", kwarg))
     elif func.args.kwarg <> None:
@@ -652,9 +658,13 @@ def invoke(call, env, stk):
 
 # pre-bind names to functions in sequences (should add classes later)
 def close(ls, env):
+    '@types: list[ast.AST], Pair -> Pair'
     for e in ls:
         if IS(e, FunctionDef):
             c = Closure(e, None)
+            env = ext(e.name, [c], env)
+        elif IS(e, ClassDef):
+            c = ClassType(e.name, e.bases, e.body, None)
             env = ext(e.name, [c], env)
     return env
 
@@ -1029,13 +1039,9 @@ def parseFile(filename):
 # clean up globals
 def clear():
     history.clear()
+    MYDICT.clear()
     global nUnknown
     nUnknown = 0
-
-
-def cleanState():
-    clear()
-    MYDICT.clear()
 
 
 def nodekey(node):
@@ -1187,15 +1193,13 @@ def addToPythonPath(dirname):
 
 def installPrinter():
     import inspect
-    import ast
-    for name, obj in inspect.getmembers(ast):
+    for _, obj in inspect.getmembers(ast):
         if (inspect.isclass(obj) and not (obj == AST)):
             obj.__repr__ = printAst
 
 installPrinter()
 
 if __name__ == '__main__':
-    import sys
     # test the checker on a file
     addToPythonPath(os.path.dirname(sys.argv[1]))
     checkFile(sys.argv[1])
