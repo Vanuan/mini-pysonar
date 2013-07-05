@@ -154,7 +154,7 @@ result_from_module_fn = with_init.knows_about_fn_from_module()
     ut.assertEqual(1, len(results))
     result = results[0]
     # assert class type 
-    ut.assertEqual(result, with_init.classtype)
+    ut.assertEqual(20, result.n)
     
 
  
