@@ -1,5 +1,7 @@
 # About this fork
 
+[![Build Status](https://travis-ci.org/Vanuan/mini-pysonar.png?branch=master)](https://travis-ci.org/Vanuan/mini-pysonar)
+
 This is a hacky fork that intends to infer the following information about method calls:
 
   * className, constructor parameters, method invocation parameters
