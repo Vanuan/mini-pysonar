@@ -310,12 +310,12 @@ class DictType(Type):
     @staticmethod
     def get_values(dict_):
         '@types: Pair -> list'
-        return [key_value_pair.fst.snd for key_value_pair in dict_]
+        return [key_value_pair.snd for key_value_pair in dict_]
     
     @staticmethod
     def get_items(dict_):
         '@types: Pair -> list'
-        return [(pair.fst.fst, pair.fst.snd) for pair in dict_]
+        return [(pair.fst, pair.snd) for pair in dict_]
 
     def __repr__(self):
         return "dict:" + str(self.dict)
