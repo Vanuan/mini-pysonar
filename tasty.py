@@ -4,19 +4,29 @@ import ast
 import pysonar as ps
 import functools
 import lists
+from itertools import chain
 
 
-class GetNodeValue(ast.NodeVisitor):
+class GetAstNodeValue(ast.NodeVisitor):
     
     def visit_Num(self, node):
         return node.n
     
     def visit_Str(self, node):
         return node.s
+    
+    def visit_list(self, lst):
+        return [self.visit(l) for l in lst]
 
 
-_get_value = GetNodeValue().visit
+_get_value = GetAstNodeValue().visit
 
+def flatten_list_type(list_):
+    "@types: ListType -> ListType"
+    r = []
+    for nest_list in list_.elts:
+        r.extend(nest_list)
+    return ps.ListType(r)
 
 class PysonarTest(TestCase):
 
@@ -37,6 +47,11 @@ class PysonarTest(TestCase):
         self._assertType(ast.Num, actual)
         self._assert(expected, actual.n)
     
+    def assertFlattenedList(self, expected, actual):
+        '@types: list, ListType'
+        actual = flatten_list_type(actual)
+        self.assertList(expected, actual)
+
     def assertList(self, expected, actual):
         '@types: dict, pysonar.ListType'
         self._assertType(ps.ListType, actual)
@@ -57,10 +72,8 @@ class PysonarTest(TestCase):
             actual_value = _get_value(values[0])
             self._assert(expected.get(actual_key), actual_value,
                          "Different values for the same key: %s" % actual_key)
-
             
         
-
     
 def as_unit(fn):
     @functools.wraps(fn)
