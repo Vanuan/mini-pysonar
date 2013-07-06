@@ -11,6 +11,7 @@ from collections import defaultdict
 import os
 import logging
 from functools import partial
+from itertools import imap
 
 logging.basicConfig(filename="_pysonar.log", level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -102,16 +103,23 @@ class Type:
 
 
 nUnknown = 0
+
 class UnknownType(Type):
-    def __init__(self, name=None):
+    def __init__(self, obj=None):
+        self.obj = obj
+
         global nUnknown
-        if name <> None:
-            self.name = name + str(nUnknown)
-        else:
-            self.name = '_' + str(nUnknown)
         nUnknown += 1
+        
+    def __iter__(self):
+        return iter((self,))
+
     def __repr__(self):
-        return str(self.name)
+        return "Unknown(%r)" % self.obj
+    
+
+def unknown(*msgs):
+    return UnknownType(' '.join(imap(str, msgs)))
 
 
 class PrimType(Type):
@@ -197,14 +205,15 @@ class FuncType(Type):
     def __init__(self, fromtype, totype):
         self.fromtype = fromtype
         self.totype = totype
+        
     def __repr__(self):
         return str(self.fromtype) + " -> " + str(self.totype)
+
     def __eq__(self, other):
-        if IS(other, FuncType):
-            return ((self.fromtype == other.fromtype) and
-                    self.totype == other.totype)
-        else:
-            return False
+        return (IS(other, FuncType)
+                and (self.fromtype == other.fromtype)
+                and self.totype == other.totype)
+
     def __ne__(self, other):
         return not self.__eq__(other)
 
@@ -539,7 +548,7 @@ def invoke1(call, clo, env, stk):
             infer(a, env, stk)
         for k in call.keywords:
             infer(k.value, env, stk)
-        err = TypeError('calling non-callable', clo)
+        err = unknown('calling non-callable', clo)
         putInfo(call, err)
         return [err]
     if IS(clo, ClassType):
@@ -575,7 +584,7 @@ def invoke1(call, clo, env, stk):
                 elif IS(closure, ClassType):
                     types.extend(invoke1(call, closure, env, stk))
                 else:
-                    types.append(TypeError("Callable type %s is not supported" % closure))
+                    types.append(unknown("Callable type %s is not supported" % closure))
             return types
         elif IS(attr.obj, DictType):
             r = []
@@ -588,7 +597,7 @@ def invoke1(call, clo, env, stk):
                 r = [attr.clo(attr.obj.dict, *infered_args)]
             return r
         else:
-            err = TypeError('AttrType object is not supported for the invoke', attr)
+            err = unknown('AttrType object is not supported for the invoke', attr)
             putInfo(call, err)
             return [err]
     return invokeClosure(call, call.args, clo, env, stk)
@@ -629,7 +638,7 @@ def invokeClosure(call, actualParams, clo, env, stk):
     # report error and go on otherwise
     if len(actualParams) > len(func.args.args):
         if func.args.vararg == None:
-            err = TypeError('excess arguments to function')
+            err = unknown('excess arguments to function')
             putInfo(call, err)
             return [err]
         else:
@@ -645,7 +654,7 @@ def invokeClosure(call, actualParams, clo, env, stk):
         ts = infer(k.value, env, stk)
         tloc1 = lookup(k.arg, pos)
         if tloc1 <> None:
-            putInfo(call, TypeError('multiple values for keyword argument',
+            putInfo(call, unknown('multiple values for keyword argument',
                                      k.arg, tloc1))
         elif k.arg not in ids:
             kwarg = bind(k.arg, ts, kwarg)
@@ -658,7 +667,7 @@ def invokeClosure(call, actualParams, clo, env, stk):
         if func.args.kwarg <> None:
             pos = bind(func.args.kwarg, [DictType(reverse(kwarg))], pos)
         else:
-            putInfo(call, TypeError("unexpected keyword arguements", kwarg))
+            putInfo(call, unknown("unexpected keyword arguements", kwarg))
     elif func.args.kwarg <> None:
         pos = bind(func.args.kwarg, [DictType(nil)], pos)
 
@@ -744,7 +753,7 @@ def inferSeq(exp, env, stk):
 
         if isTerminating(t1) and isTerminating(t2):                   # both terminates
             for e2 in exp[1:]:
-                putInfo(e2, TypeError('unreachable code'))
+                putInfo(e2, unknown('unreachable code'))
             return (union([t1, t2]), env)
 
         elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
@@ -769,7 +778,7 @@ def inferSeq(exp, env, stk):
 
         if isTerminating(t1) and isTerminating(t2):                   # both terminates
             for e2 in exp[1:]:
-                putInfo(e2, TypeError('unreachable code'))
+                putInfo(e2, unknown('unreachable code'))
             return (union([t1, t2]), env)
 
         elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
@@ -797,7 +806,7 @@ def inferSeq(exp, env, stk):
         
                 if isTerminating(t1) and isTerminating(t2):                   # both terminates
                     for e2 in exp[1:]:
-                        putInfo(e2, TypeError('unreachable code'))
+                        putInfo(e2, unknown('unreachable code'))
                     return (union([t1, t2]), env)
         
                 elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
@@ -844,7 +853,7 @@ def inferSeq(exp, env, stk):
         t1 = infer(e.value, env, stk)
         (t2, env2) = inferSeq(exp[1:], env, stk)
         for e2 in exp[1:] :
-            putInfo(e2, TypeError('unreachable code'))
+            putInfo(e2, unknown('unreachable code'))
         return (t1, env)
 
     elif IS(e, Expr):
@@ -896,7 +905,7 @@ def inferSeq(exp, env, stk):
 
         if isTerminating(t1) and isTerminating(t2):                   # both terminates
             for e2 in exp[1:]:
-                putInfo(e2, TypeError('unreachable code'))
+                putInfo(e2, unknown('unreachable code'))
             return (union([t1, t2]), env)
 
         elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
@@ -921,7 +930,7 @@ def inferSeq(exp, env, stk):
 
         if isTerminating(t1) and isTerminating(t2):                   # both terminates
             for e2 in exp[1:]:
-                putInfo(e2, TypeError('unreachable code'))
+                putInfo(e2, unknown('unreachable code'))
             return (union([t1, t2]), env)
 
         elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
@@ -978,7 +987,7 @@ def inferSeq(exp, env, stk):
         return inferSeq(exp[1:], env, stk)
 
     else:
-        raise TypeError('recognized node in effect context', e)
+        raise unknown('recognized node in effect context', e)
 
 
 
@@ -1037,15 +1046,15 @@ def infer(exp, env, stk):
             # find attr name in object and return it
             for o in t:
                 if not IS(o, (ObjType, ClassType, DictType)):
-                    attribs.append(TypeError('unknown object', o))
+                    attribs.append(unknown('unknown object', o))
                     continue
                 if exp.attr in o.attrs:
                     attribs.append(AttrType(o.attrs[exp.attr], o, exp.value))
                 else:
-                    attribs.append(TypeError('no such attribute', exp.attr))
+                    attribs.append(unknown('no such attribute', exp.attr))
             return attribs
         else:
-            return [UnknownType()]
+            return [UnknownType(exp)]
 
     ## ignore complex types for now
     # elif IS(exp, List):
@@ -1076,7 +1085,7 @@ def infer(exp, env, stk):
                                       lists.slist(infered_values)))]
 
     else:
-        return [UnknownType()]
+        return [UnknownType(exp)]
 
 
 
@@ -1164,7 +1173,7 @@ def dump(node, annotate_fields=True, include_attributes=False):
             return '[%s]' % ', '.join(_format(x) for x in node)
         return repr(node)
     if not isinstance(node, AST):
-        raise TypeError('expected AST, got %r' % node.__class__.__name__)
+        raise unknown('expected AST, got %r' % node.__class__.__name__)
     return _format(node)
 
 

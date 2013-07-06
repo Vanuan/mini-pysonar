@@ -57,10 +57,22 @@ def iter_over_list():
         return e
 
 r = iter_over_list()
+
+
+def iter_over_list2():
+    for e in list(l1):
+        return e
+
+
+r2 = iter_over_list2()
     '''
     ps.checkString(s)
     r = first_in_history('r', ps)
     ut.assertNum(1, r)
+
+    r = first_in_history('r2', ps)
+    # unknown type due to unknown list function 
+    ut._assertType(ps.UnknownType, r)
 
 
 @as_unit
