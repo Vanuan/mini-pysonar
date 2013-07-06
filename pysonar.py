@@ -288,12 +288,41 @@ class ListType(Type):
 
 
 class DictType(Type):
-    def __init__(self, dic):
+    
+    def __init__(self, dict_):
         '@types: Pair'
-        self.dic = dic
+        self.dict = dict_
+        self.attrs = {'keys': self.get_keys,
+                      'iterkeys': self.get_keys,
+                      'values': self.get_values,
+                      'itervalues': self.get_values,
+                      'items': self.get_items,
+                      'iteritems': self.get_items,
+                      'get': self.get_key}
+        self.iter_operations = (self.get_keys, self.get_values, self.get_items)
+        
+    @staticmethod
+    def get_key(dict_, key):
+        '@types: Pair, ? -> list'
+        return lists.lookup(key, dict_)
+
+    @staticmethod
+    def get_keys(dict_):
+        '@types: Pair -> list'
+        return [key_value_pair.fst for key_value_pair in dict_]
+    
+    @staticmethod
+    def get_values(dict_):
+        '@types: Pair -> list'
+        return [key_value_pair.fst.snd for key_value_pair in dict_]
+    
+    @staticmethod
+    def get_items(dict_):
+        '@types: Pair -> list'
+        return [(pair.fst.fst, pair.fst.snd) for pair in dict_]
 
     def __repr__(self):
-        return "dict:" + str(self.dic)
+        return "dict:" + str(self.dict)
 
     # any hashable value can be used as keys
     # any object can be used as values
