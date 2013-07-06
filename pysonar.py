@@ -552,10 +552,7 @@ def invoke1(call, clo, env, stk):
         return [obj]
     if IS(clo, AttrType):
         attr = clo
-        if not IS(attr.obj, ObjType):
-            err = TypeError('AttrType object is not an object', attr)
-            putInfo(call, err)
-            return [err]
+        if IS(attr.obj, ObjType):
         # add self to function call args
         actualParams = list(call.args)
         classtype = attr.obj.classtype
@@ -577,6 +574,20 @@ def invoke1(call, clo, env, stk):
             else:
                 types.append(TypeError("Callable type %s is not supported" % closure))
         return types
+        elif IS(attr.obj, DictType):
+            r = []
+            if attr.clo in attr.obj.iter_operations:
+                r = [attr.clo(attr.obj.dict)]
+            else:
+                # we take the first version of infered arguments but ideally
+                # all must be processed
+                infered_args = [infer(arg, env, stk) for arg in call.args]
+                r = [attr.clo(attr.obj.dict, *infered_args)]
+            return r
+        else:
+            err = TypeError('AttrType object is not supported for the invoke', attr)
+            putInfo(call, err)
+            return [err]
     return invokeClosure(call, call.args, clo, env, stk)
 
 
