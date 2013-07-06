@@ -3,8 +3,10 @@
 import sys
 import re
 import ast
+import lists
 from ast import *
 from lists import *
+
 from collections import defaultdict
 import os
 import logging
@@ -287,7 +289,9 @@ class ListType(Type):
 
 class DictType(Type):
     def __init__(self, dic):
+        '@types: Pair'
         self.dic = dic
+
     def __repr__(self):
         return "dict:" + str(self.dic)
 
@@ -295,10 +299,8 @@ class DictType(Type):
     # any object can be used as values
     # so we can know almost nothing about the dictionaries
     def __eq__(self, other):
-        if IS(other, DictType):
-            return True
-        else:
-            return False
+        return IS(other, DictType)
+
     def __ne__(self, other):
         return not self.__eq__(other)
 
@@ -306,6 +308,7 @@ class DictType(Type):
 class UnionType(Type):
     def __init__(self, elts):
         self.elts = elts
+
     def __repr__(self):
         return "U:" + str(self.elts)
 
@@ -1027,6 +1030,12 @@ def infer(exp, env, stk):
 
     elif IS(exp, ObjType):
         return exp
+    
+    elif IS(exp, ast.Dict):
+        infered_keys = [infer(key, env, stk) for key in exp.keys]
+        infered_values = [infer(value, env, stk) for value in exp.values]
+        return [DictType(lists.ziplist(lists.slist(infered_keys),
+                                      lists.slist(infered_values)))]
 
     else:
         return [UnknownType()]
