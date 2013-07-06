@@ -47,8 +47,21 @@ dict_3 = {1: 2,
     ut.assertDictValueAsDict({1: 2, 3: 4}, dict_3, 3)
 
     
-    
-    
+@as_unit
+def test_list_iteration(ut):    
+    s = '''
+l1 = [1, 2, 3]
+
+def iter_over_list():
+    for e in l1:
+        return e
+
+r = iter_over_list()
+    '''
+    ps.checkString(s)
+    r = first_in_history('r', ps)
+    ut.assertNum(1, r)
+
 
 @as_unit
 def _test_dict_iteration_by_keys(ut):

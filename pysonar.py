@@ -279,6 +279,9 @@ class ListType(Type):
         return (IS(other, ListType)
                 and self.elts == other.elts)
 
+    def __iter__(self):
+        return iter(self.elts)
+
     def __ne__(self, other):
         return not self.__eq__(other)
 
