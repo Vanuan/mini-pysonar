@@ -150,7 +150,7 @@ result = a.m(keyarg='100')
     results = find_in_history('result', ps)
 
     ut.assertEqual(1, len(results))
-    result_as_pair = results[0].dic
+    result_as_pair = results[0].dict
     ut.assertEquals('keyarg', result_as_pair.fst.fst)
     ut.assertEquals('100', result_as_pair.fst.snd[0].s)
     result_as_pair.fst
