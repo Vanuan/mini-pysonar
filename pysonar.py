@@ -553,27 +553,27 @@ def invoke1(call, clo, env, stk):
     if IS(clo, AttrType):
         attr = clo
         if IS(attr.obj, ObjType):
-        # add self to function call args
-        actualParams = list(call.args)
-        classtype = attr.obj.classtype
-        saveMethodInvocationInfo(call, attr, env, stk)
-        # TODO: @staticmethod, @classmethod
-        if classtype.name != 'module':
-            actualParams.insert(0, attr.objT)
-        types = []
-        for closure in IS(attr.clo, list) and attr.clo or (attr.clo,):
-            if IS(closure, Closure):
-                #debug('invoking method', closure, 'with args', call.args)
-                # Create new env for method
-                # On each call ClassType.env might be different
-                new_closure = Closure(closure.func, classtype.env)
-                debug('invoking method', closure.func.name, 'with args', call.args)
-                types.extend(invokeClosure(call, actualParams, new_closure, env, stk))
-            elif IS(closure, ClassType):
-                types.extend(invoke1(call, closure, env, stk))
-            else:
-                types.append(TypeError("Callable type %s is not supported" % closure))
-        return types
+            # add self to function call args
+            actualParams = list(call.args)
+            classtype = attr.obj.classtype
+            saveMethodInvocationInfo(call, attr, env, stk)
+            # TODO: @staticmethod, @classmethod
+            if classtype.name != 'module':
+                actualParams.insert(0, attr.objT)
+            types = []
+            for closure in IS(attr.clo, list) and attr.clo or (attr.clo,):
+                if IS(closure, Closure):
+                    #debug('invoking method', closure, 'with args', call.args)
+                    # Create new env for method
+                    # On each call ClassType.env might be different
+                    new_closure = Closure(closure.func, classtype.env)
+                    debug('invoking method', closure.func.name, 'with args', call.args)
+                    types.extend(invokeClosure(call, actualParams, new_closure, env, stk))
+                elif IS(closure, ClassType):
+                    types.extend(invoke1(call, closure, env, stk))
+                else:
+                    types.append(TypeError("Callable type %s is not supported" % closure))
+            return types
         elif IS(attr.obj, DictType):
             r = []
             if attr.clo in attr.obj.iter_operations:
@@ -785,30 +785,33 @@ def inferSeq(exp, env, stk):
             return (union([t1, t2, t3]), env3)
 
     elif IS(e, For):
-        # TODO evaluate iter and target
-        (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
-        (t2, env2) = inferSeq(e.orelse, close(e.orelse, env), stk)
-
-        if isTerminating(t1) and isTerminating(t2):                   # both terminates
-            for e2 in exp[1:]:
-                putInfo(e2, TypeError('unreachable code'))
-            return (union([t1, t2]), env)
-
-        elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
-            (t3, env3) = inferSeq(exp[1:], env2, stk)
-            t2 = finalize(t2)
-            return (union([t1, t2, t3]), env3)
-
-        elif not isTerminating(t1) and isTerminating(t2):             # t2 terminates
-            (t3, env3) = inferSeq(exp[1:], env1, stk)
-            t1 = finalize(t1)
-            return (union([t1, t2, t3]), env3)
-        else:                                                         # both non-terminating
-            (t3, env3) = inferSeq(exp[1:], mergeEnv(env1, env2), stk)
-            t1 = finalize(t1)
-            t2 = finalize(t2)
-            return (union([t1, t2, t3]), env3)
-
+        infered_iter_values = infer(e.iter, env, stk)
+        for infered_iter_value in infered_iter_values:
+            for value in infered_iter_value:
+                env = bind(e.target, value, env)
+                (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
+                (t2, env2) = inferSeq(e.orelse, close(e.orelse, env), stk)
+        
+                if isTerminating(t1) and isTerminating(t2):                   # both terminates
+                    for e2 in exp[1:]:
+                        putInfo(e2, TypeError('unreachable code'))
+                    return (union([t1, t2]), env)
+        
+                elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
+                    (t3, env3) = inferSeq(exp[1:], env2, stk)
+                    t2 = finalize(t2)
+                    return (union([t1, t2, t3]), env3)
+        
+                elif not isTerminating(t1) and isTerminating(t2):             # t2 terminates
+                    (t3, env3) = inferSeq(exp[1:], env1, stk)
+                    t1 = finalize(t1)
+                    return (union([t1, t2, t3]), env3)
+                else:                                                         # both non-terminating
+                    (t3, env3) = inferSeq(exp[1:], mergeEnv(env1, env2), stk)
+                    t1 = finalize(t1)
+                    t2 = finalize(t2)
+                    return (union([t1, t2, t3]), env3)
+    
     elif IS(e, Assign):
         t = infer(e.value, env, stk)
         for x in e.targets:
@@ -1042,7 +1045,7 @@ def infer(exp, env, stk):
             attribs = []
             # find attr name in object and return it
             for o in t:
-                if not IS(o, (ObjType, ClassType)):
+                if not IS(o, (ObjType, ClassType, DictType)):
                     attribs.append(TypeError('unknown object', o))
                     continue
                 if exp.attr in o.attrs:
