@@ -449,6 +449,10 @@ def getId(x):
         return x
 
 
+def getName(x, lineno):
+    return Name(id=x, lineno=lineno)
+
+
 def bind(target, infered_value, env):
     if IS(target, Name) or IS(target, str):
         u = infered_value
@@ -846,33 +850,21 @@ def inferSeq(exp, env, stk):
 
     elif IS(e, ImportFrom):
         _, module_symbols = get_module_symbols(e.module)
-        #print 'importing module', e.module
-        #module = getModuleExp(e.module)
-        #env1 = close(module.body, nil)  # TODO refactor along with infer(list)
-        #_, module_symbols = inferSeq(module.body, env1, nil)
-        #print 'module %s imported' % e.module
-        #print 'module', e.module, module_symbols
         for module_name in e.names:
             name_to_import = module_name.name
             name_import_as = module_name.asname or name_to_import
             module_symbol = lookup(name_to_import, module_symbols)
-            #print module_name.name, module_symbol
-            env = append(Pair(Pair(name_import_as, module_symbol), nil), env)
-        #names = map(lambda name: module.body ,e.names)
+            env = bind(getName(name_import_as, e.lineno), module_symbol, env)
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, Import):
         for module_name in e.names:
             name_to_import = module_name.name
             module, module_env = get_module_symbols(name_to_import)
-            #module = getModuleExp(name_to_import)
-            #env1 = close(module.body, nil)
-            #_, module_env = inferSeq(module.body, env1, nil)
-           #module_env = close(module.body, nil)
             name_import_as = module_name.asname or module_name.name
             module_class = ClassType('module', [], module.body, module_env)
             module_obj = [ObjType(module_class, [], env)]  # probably env is not needed here
-            env = append(Pair(Pair(name_import_as, module_obj), nil), env)
+            env = bind(getName(name_import_as, e.lineno), module_obj, env)
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, ClassDef):

@@ -1,5 +1,6 @@
 import pysonar as ps
 from tasty import as_unit, first_in_history
+from nose.tools import nottest
 
 
 @as_unit
@@ -16,3 +17,35 @@ result = x()
     result = first_in_history('result', ps)
     ut.assertTrue(isinstance(result, ps.ObjType))
     ut.assertEqual("module", result.classtype.name)
+
+
+@nottest
+@as_unit
+def test_import_module_with_class(ut):
+    # set up
+    ps.addToPythonPath('tests')
+
+    # exercise
+    ps.checkString('import class_a')
+
+    # verify
+    result = first_in_history('class_a', ps)
+    ut.assertTrue(isinstance(result, ps.ObjType))
+    ut.assertTrue('a' in result.attrs.keys())
+    ut.assertTrue(isinstance(result.attrs['a'], ps.ObjType))
+
+
+@as_unit
+def test_import_module_with_func(ut):
+    # set up
+    ps.addToPythonPath('tests')
+
+    # exercise
+    ps.checkString('import func_a')
+
+    # verify
+    result = first_in_history('func_a', ps)
+    ut.assertTrue(isinstance(result, ps.ObjType))
+    ut.assertTrue('a' in result.attrs.keys())
+    ut.assertTrue(isinstance(result.attrs['a'], ps.Closure))
+
