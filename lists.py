@@ -29,6 +29,7 @@ class Pair:
     def __init__(self, fst, snd):
         self.fst = fst
         self.snd = snd
+
     def __repr__(self):
         if (self.snd == nil):
             return "(" + repr(self.fst) + ")"
@@ -37,8 +38,10 @@ class Pair:
             return "(" + repr(self.fst) + " " + s[1:-1] + ")"
         else:
             return "(" + repr(self.fst) + " . " + repr(self.snd) + ")"
+
     def __iter__(self):
         return PairIterator(self)
+
     def __eq__(self, other):
         if not isinstance(other, Pair):
             return False
@@ -79,6 +82,9 @@ def assoc(u, v):
     return Pair(Pair(u, v), nil)
 
 def slist(pylist):
+    '''
+    Make linked list using Pair of python list
+    @types: iterable[T] -> Pair[T, Pair]'''
     ret = nil
     for i in xrange(len(pylist)):
         ret = Pair(pylist[len(pylist)-i-1], ret)

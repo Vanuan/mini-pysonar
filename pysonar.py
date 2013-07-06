@@ -269,20 +269,16 @@ class TupleType(Type):
 
 class ListType(Type):
     def __init__(self, elts):
+        '@types: Pair'
         self.elts = elts
+
     def __repr__(self):
         return "list:" + str(self.elts)
+
     def __eq__(self, other):
-        if IS(other, ListType):
-            if len(self.elts) <> len(other.elts):
-                return False
-            else:
-                for i in xrange(len(self.elts)):
-                    if self.elts[i] <> other.elts[i]:
-                        return False
-                return True
-        else:
-            return False
+        return (IS(other, ListType)
+                and self.elts == other.elts)
+
     def __ne__(self, other):
         return not self.__eq__(other)
 
@@ -1073,6 +1069,10 @@ def infer(exp, env, stk):
 
     elif IS(exp, ObjType):
         return exp
+    
+    elif IS(exp, ast.List):
+        infered_elts = lists.slist([infer(el, env, stk) for el in exp.elts])
+        return [ListType(infered_elts)]
     
     elif IS(exp, ast.Dict):
         infered_keys = [infer(key, env, stk) for key in exp.keys]
