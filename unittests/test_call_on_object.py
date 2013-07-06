@@ -8,6 +8,7 @@ from tasty import as_unit, find_in_history
 
 @as_unit
 def test_bound_method_call_and_obj_new_attr_creation(ut):
+    # exercise
     s = '''
 class B:
     def x(self, p):
@@ -18,6 +19,7 @@ new_b = B().x(2)
     '''
     ps.checkString(s)
 
+    # verify
     class_types = find_in_history('B', ps)
     ut.assertEqual(1, len(class_types))
     class_type = class_types[0]
@@ -25,8 +27,10 @@ new_b = B().x(2)
     ut.assertEqual(1, len(class_type.attrs))
     
     clo = class_type.attrs.get('x')
-    ut.assertTrue(isinstance(clo, ps.Closure))
-    ut.assertEqual([], clo.defaults)
+    ut.assertTrue(isinstance(clo, list))
+    ut.assertTrue(len(clo))
+    ut.assertTrue(isinstance(clo[0], ps.Closure))
+    ut.assertEqual([], clo[0].defaults)
     
     # assert new instance
     values = find_in_history("new_b", ps)

@@ -157,11 +157,10 @@ class ClassType(Type):
         self.__saveClassAttrs(body)
 
     def __saveClassAttrs(self, body):
-        for classattr in body:
-            if IS(classattr, FunctionDef):
-                # TODO here we really want a special env, that will include
-                # only variables accessible in function's body
-                self.attrs[classattr.name] = Closure(classattr, self.env)
+        env = close(body, nil)  # {Name.id -> (Closure | ClassType)}
+        for pair in env:
+            # Closure's env will be updated, when invoking AttrType
+            self.attrs[pair.fst] = pair.snd
 
     def __repr__(self):
         return "class:" + self.name
@@ -223,12 +222,13 @@ class AttrType(Type):
     Reference on object attribute value, so binds object with this value while
     name is determined in the context (or environment)
     '''
-    def __init__(self, closure, o, objT):
-        '''@types: Closure or list[Closure], ObjType, ast.AST
+    def __init__(self, closures, o, objT):
+        '''@types: list[Closure], ObjType, ast.AST
         @param: objT is a value of ast.Attribute
         '''
         # self.env = closure.env
-        self.clo = closure
+        assert IS(closures, list)
+        self.clo = closures
         self.obj = o
         self.objT = objT
 
@@ -300,13 +300,13 @@ class DictType(Type):
     def __init__(self, dict_):
         '@types: Pair'
         self.dict = dict_
-        self.attrs = {'keys': self.get_keys,
-                      'iterkeys': self.get_keys,
-                      'values': self.get_values,
-                      'itervalues': self.get_values,
-                      'items': self.get_items,
-                      'iteritems': self.get_items,
-                      'get': self.get_key}
+        self.attrs = {'keys': [self.get_keys],
+                      'iterkeys': [self.get_keys],
+                      'values': [self.get_values],
+                      'itervalues': [self.get_values],
+                      'items': [self.get_items],
+                      'iteritems': [self.get_items],
+                      'get': [self.get_key]}
         self.iter_operations = (self.get_keys, self.get_values, self.get_items)
         
     @staticmethod
@@ -554,14 +554,18 @@ def invoke1(call, clo, env, stk):
     if IS(clo, ClassType):
         debug('creating instance of', clo)
         ctorargs = [infer(arg, env, stk) for arg in call.args]
-        obj = ObjType(clo, ctorargs, clo.env)
-        init_closure = obj.attrs.get('__init__')
-        if init_closure:
-            self_arg = get_self_arg_name(init_closure.func)
-            ref_to_init = AttrType(init_closure, obj, self_arg)
-            init_env = ext(self_arg.id, [obj], env)
+        new_obj = ObjType(clo, ctorargs, clo.env)
+        init_closures = new_obj.attrs.get('__init__', [])
+        if len(init_closures):
+            # we don't really care about this name,
+            # we just don't want to collide with method's global symbols
+            # TODO: generate a special name,
+            #       that would represent a temporary object 
+            self_arg = get_self_arg_name(init_closures[0].func)
+            ref_to_init = AttrType(init_closures, new_obj, self_arg)
+            init_env = ext(self_arg.id, [new_obj], env)
             invoke1(call, ref_to_init, init_env, stk)
-        return [obj]
+        return [new_obj]
     if IS(clo, AttrType):
         attr = clo
         if IS(attr.obj, ObjType):
@@ -573,9 +577,8 @@ def invoke1(call, clo, env, stk):
             if classtype.name != 'module':
                 actualParams.insert(0, attr.objT)
             types = []
-            for closure in IS(attr.clo, list) and attr.clo or (attr.clo,):
+            for closure in attr.clo:
                 if IS(closure, Closure):
-                    #debug('invoking method', closure, 'with args', call.args)
                     # Create new env for method
                     # On each call ClassType.env might be different
                     new_closure = Closure(closure.func, classtype.env)
@@ -588,13 +591,14 @@ def invoke1(call, clo, env, stk):
             return types
         elif IS(attr.obj, DictType):
             r = []
-            if attr.clo in attr.obj.iter_operations:
-                r = [attr.clo(attr.obj.dict)]
-            else:
-                # we take the first version of infered arguments but ideally
-                # all must be processed
-                infered_args = [infer(arg, env, stk) for arg in call.args]
-                r = [attr.clo(attr.obj.dict, *infered_args)]
+            for closure in attr.clo:
+                if closure in attr.obj.iter_operations:
+                    r.append(closure(attr.obj.dict))
+                else:
+                    # we take the first version of infered arguments but ideally
+                    # all must be processed
+                    infered_args = [infer(arg, env, stk) for arg in call.args]
+                    r.append(closure(attr.obj.dict, *infered_args))
             return r
         else:
             err = unknown('AttrType object is not supported for the invoke', attr)
@@ -724,6 +728,8 @@ def close(code_block, env):
         elif IS(e, ClassDef):
             c = ClassType(e.name, e.bases, e.body, nil)
             env = ext(e.name, [c], env)
+        # here we also need Import and Assign
+        # Assign is complicated
     return env
 
 
