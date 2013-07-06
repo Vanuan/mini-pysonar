@@ -34,10 +34,20 @@ def test_dict_initializator(ut):
 dict_ = {}
 dict_2 = {1: 2,
           3: 4}
+          
+dict_3 = {1: 2,
+          3: dict_2}
 '''
     ps.checkString(s)
     ut.assertDict({}, first_in_history("dict_", ps))
     ut.assertDict({1: 2, 3: 4}, first_in_history("dict_2", ps))
+
+    dict_3 = first_in_history("dict_3", ps)
+    ut.assertSubDict({1: 2}, dict_3)
+    ut.assertDictValueAsDict({1: 2, 3: 4}, dict_3, 3)
+
+    
+    
     
 
 @as_unit
