@@ -10,8 +10,13 @@ class GetNodeValue(ast.NodeVisitor):
     
     def visit_Num(self, node):
         return node.n
+    
+    def visit_Str(self, node):
+        return node.s
+
 
 _get_value = GetNodeValue().visit
+
 
 class PysonarTest(TestCase):
 
@@ -32,6 +37,15 @@ class PysonarTest(TestCase):
         self._assertType(ast.Num, actual)
         self._assert(expected, actual.n)
     
+    def assertList(self, expected, actual):
+        '@types: dict, pysonar.ListType'
+        self._assertType(ps.ListType, actual)
+        actual = actual.elts
+        self._assert(len(expected), lists.length(actual), "Size mismatch")
+        for i, actual_value in enumerate(actual):
+            self._assert(expected[i], _get_value(actual_value),
+                         "Different values at index: %s" % i)
+
     def assertDict(self, expected, actual):
         '@types: dict, pysonar.DictType'
         self._assertType(ps.DictType, actual)
