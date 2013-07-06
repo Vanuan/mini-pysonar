@@ -9,7 +9,26 @@ from tasty import as_unit, first_in_history
 
 
 @as_unit
-def test_dict_initializator_literal(ut):
+def test_list_literal(ut):
+    'List literal support'
+    s = '''
+the_list = []
+
+non_empty_list = [1, 2, 3]
+string_list = ["a", "b", "c"]
+
+x = "20"
+list_with_infering_involved = [1, "b", x]
+'''
+    ps.checkString(s)
+    ut.assertList([], first_in_history("the_list", ps))
+    ut.assertFlattenedList([1, 2, 3], first_in_history("non_empty_list", ps))
+    ut.assertFlattenedList(["a", "b", "c"], first_in_history("string_list", ps))
+    ut.assertFlattenedList([1, "b", "20"], first_in_history("list_with_infering_involved", ps))
+
+
+@as_unit
+def test_dict_initializator(ut):
     'Dictionary literal support'
     s = '''
 dict_ = {}
