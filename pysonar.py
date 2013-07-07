@@ -111,16 +111,9 @@ class UnknownType(Type):
         global nUnknown
         nUnknown += 1
         
-#    def __iter__(self):
-#        return iter((self,))
-
     def __repr__(self):
         return "Unknown(%r)" % self.obj
     
-
-def unknown(*msgs):
-    return UnknownType(' '.join(imap(str, msgs)))
-
 
 class PrimType(Type):
     def __init__(self, name):
@@ -568,7 +561,7 @@ def invoke1(call, clo, env, stk):
             infer(a, env, stk)
         for k in call.keywords:
             infer(k.value, env, stk)
-        err = unknown('calling non-callable', clo)
+        err = TypeError('calling non-callable', clo)
         putInfo(call, err)
         return [err]
     if IS(clo, ClassType):
@@ -607,7 +600,7 @@ def invoke1(call, clo, env, stk):
                 elif IS(closure, ClassType):
                     types.extend(invoke1(call, closure, env, stk))
                 else:
-                    types.append(unknown("Callable type %s is not supported" % closure))
+                    types.append(TypeError("Callable type %s is not supported" % closure))
             return types
         elif IS(attr.obj, DictType):
             types = []
@@ -621,7 +614,7 @@ def invoke1(call, clo, env, stk):
                     types.extend(closure(attr.obj.dict, *infered_args))
             return types
         else:
-            err = unknown('AttrType object is not supported for the invoke', attr)
+            err = TypeError('AttrType object is not supported for the invoke', attr)
             putInfo(call, err)
             return [err]
     return invokeClosure(call, call.args, clo, env, stk)
@@ -662,7 +655,7 @@ def invokeClosure(call, actualParams, clo, env, stk):
     # report error and go on otherwise
     if len(actualParams) > len(func.args.args):
         if func.args.vararg == None:
-            err = unknown('excess arguments to function')
+            err = TypeError('excess arguments to function')
             putInfo(call, err)
             return [err]
         else:
@@ -678,7 +671,7 @@ def invokeClosure(call, actualParams, clo, env, stk):
         ts = infer(k.value, env, stk)
         tloc1 = lookup(k.arg, pos)
         if tloc1 <> None:
-            putInfo(call, unknown('multiple values for keyword argument',
+            putInfo(call, TypeError('multiple values for keyword argument',
                                      k.arg, tloc1))
         elif k.arg not in ids:
             kwarg = bind(k.arg, ts, kwarg)
@@ -691,7 +684,7 @@ def invokeClosure(call, actualParams, clo, env, stk):
         if func.args.kwarg <> None:
             pos = bind(func.args.kwarg, [DictType(reverse(kwarg))], pos)
         else:
-            putInfo(call, unknown("unexpected keyword arguements", kwarg))
+            putInfo(call, TypeError("unexpected keyword arguements", kwarg))
     elif func.args.kwarg <> None:
         pos = bind(func.args.kwarg, [DictType(nil)], pos)
 
@@ -776,7 +769,7 @@ def inferSeq(exp, env, stk):
 
         if isTerminating(t1) and isTerminating(t2):                   # both terminates
             for e2 in exp[1:]:
-                putInfo(e2, unknown('unreachable code'))
+                putInfo(e2, TypeError('unreachable code'))
             return (union([t1, t2]), env)
 
         elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
@@ -801,7 +794,7 @@ def inferSeq(exp, env, stk):
 
         if isTerminating(t1) and isTerminating(t2):                   # both terminates
             for e2 in exp[1:]:
-                putInfo(e2, unknown('unreachable code'))
+                putInfo(e2, TypeError('unreachable code'))
             return (union([t1, t2]), env)
 
         elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
@@ -828,7 +821,7 @@ def inferSeq(exp, env, stk):
 
         if isTerminating(t1) and isTerminating(t2):                   # both terminates
             for e2 in exp[1:]:
-                putInfo(e2, unknown('unreachable code'))
+                putInfo(e2, TypeError('unreachable code'))
             return (union([t1, t2]), env)
 
         elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
@@ -872,7 +865,7 @@ def inferSeq(exp, env, stk):
         t1 = infer(e.value, env, stk)
         (t2, env2) = inferSeq(exp[1:], env, stk)
         for e2 in exp[1:] :
-            putInfo(e2, unknown('unreachable code'))
+            putInfo(e2, TypeError('unreachable code'))
         return (t1, env)
 
     elif IS(e, Expr):
@@ -924,7 +917,7 @@ def inferSeq(exp, env, stk):
 
         if isTerminating(t1) and isTerminating(t2):                   # both terminates
             for e2 in exp[1:]:
-                putInfo(e2, unknown('unreachable code'))
+                putInfo(e2, TypeError('unreachable code'))
             return (union([t1, t2]), env)
 
         elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
@@ -949,7 +942,7 @@ def inferSeq(exp, env, stk):
 
         if isTerminating(t1) and isTerminating(t2):                   # both terminates
             for e2 in exp[1:]:
-                putInfo(e2, unknown('unreachable code'))
+                putInfo(e2, TypeError('unreachable code'))
             return (union([t1, t2]), env)
 
         elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
@@ -1005,8 +998,11 @@ def inferSeq(exp, env, stk):
     elif IS(e, ast.Subscript):
         return inferSeq(exp[1:], env, stk)
 
+    elif IS(e, ast.Exec):
+        return inferSeq(exp[1:], env, stk)
+
     else:
-        raise unknown('recognized node in effect context', e)
+        raise TypeError('recognized node in effect context', e)
 
 
 
@@ -1061,12 +1057,12 @@ def infer(exp, env, stk):
             # find attr name in object and return it
             for o in t:
                 if not IS(o, (ObjType, ClassType, DictType)):
-                    attribs.append(unknown('unknown object', o))
+                    attribs.append(TypeError('unknown object', o))
                     continue
                 if exp.attr in o.attrs:
                     attribs.append(AttrType(o.attrs[exp.attr], o, exp.value))
                 else:
-                    attribs.append(unknown('no such attribute', exp.attr))
+                    attribs.append(TypeError('no such attribute', exp.attr))
             return attribs
         else:
             return [UnknownType(exp)]
@@ -1199,7 +1195,7 @@ def dump(node, annotate_fields=True, include_attributes=False):
             return '[%s]' % ', '.join(_format(x) for x in node)
         return repr(node)
     if not isinstance(node, AST):
-        raise unknown('expected AST, got %r' % node.__class__.__name__)
+        raise TypeError('expected AST, got %r' % node.__class__.__name__)
     return _format(node)
 
 
