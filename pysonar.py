@@ -111,8 +111,8 @@ class UnknownType(Type):
         global nUnknown
         nUnknown += 1
         
-    def __iter__(self):
-        return iter((self,))
+#    def __iter__(self):
+#        return iter((self,))
 
     def __repr__(self):
         return "Unknown(%r)" % self.obj
@@ -139,7 +139,6 @@ class PrimType(Type):
 class ClassType(Type):
     def __init__(self, name, bases, body, env):
         '@types: str, list[ast.AST], list[ast.AST], Pair'
-        #print "ClassType Body", body
         self.name = name
         self.env = env
         self.attrs = {}
@@ -186,7 +185,7 @@ class ObjType(Type):
         self.ctorargs = ctorargs
 
     def __repr__(self):
-        return (str(self.classtype.name) + " instance" #+", ctor:" +
+        return ("'" + str(self.classtype.name) + "' instance" #+", ctor:" +
                 #str(self.ctorargs) + ", attrs:" + str(self.attrs)
                 )
 
@@ -296,9 +295,13 @@ class ListType(Type):
 
 
 def flatten(list_of_lists):
-    # TODO handle non-iterable types
     # TODO: handle __iter__ and next()
-    flattened = [item for sublist in list_of_lists for item in sublist]
+    flattened = []
+    for sublist in list_of_lists:
+        try:
+            flattened.extend([i for i in sublist])
+        except TypeError:
+            flattened.append(sublist)
     return flattened
 
 
@@ -320,10 +323,12 @@ class DictType(Type):
     # these functions should always return a list:
 
     @staticmethod
-    def get_key(dict_, key):
+    def get_key(dict_, key, default=None):
         '@types: Pair, ? -> list'
         # potentially, any value can be returned
         value = flatten([key_value_pair.snd for key_value_pair in dict_])
+        if default:
+            value.extend(default)
         return value
 
     @staticmethod
@@ -719,9 +724,7 @@ def invokeClosure(call, actualParams, clo, env, stk):
 # invoke a union of closures. call invoke1 on each of them and collect
 # their return types into a union
 def invoke(call, env, stk):
-    # print 'invoking', call.func
     clos = infer(call.func, env, stk)
-    # print 'closure', clos
     totypes = []
     for clo in clos:
         t = invoke1(call, clo, env, stk)
@@ -760,7 +763,6 @@ def inferSeq(exp, env, stk):
     debug('Infering sequence', exp)
 
     if exp == []:                       # reached end without return
-        #print 'Sequence end, returning', env
         return ([contType], env)
 
     e = exp[0]
@@ -817,7 +819,6 @@ def inferSeq(exp, env, stk):
     elif IS(e, For):
         values = infer(e.iter, env, stk)
         value = flatten(values)
-        print value
         env = bind(e.target, value, env)
         (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
         (t2, env2) = inferSeq(e.orelse, close(e.orelse, env), stk)
@@ -854,9 +855,6 @@ def inferSeq(exp, env, stk):
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, FunctionDef):
-        #import traceback
-        #print ''.join(traceback.format_stack())
-        #print 'infering', e, env
         cs = lookup(e.name, env)
         if not cs:
             debug('Function %s not found in scope %s' % (e.name, env))
@@ -1014,7 +1012,6 @@ def infer(exp, env, stk):
     '@types: ast.AST|object, Pair, Pair -> list[Type]'
     debug('infering', exp)
     if IS(exp, Module):
-        #print 'infering module', env
         return infer(exp.body, env, stk)
 
     elif IS(exp, list):
@@ -1031,7 +1028,6 @@ def infer(exp, env, stk):
         return [exp]#[PrimType(type(exp.s))]
 
     elif IS(exp, Name):
-        #print "Name:" + str(exp), 'ID:', exp.id
         b = lookup(exp.id, env)
         debug('infering name:', b, env)
         if (b <> None):
@@ -1056,8 +1052,6 @@ def infer(exp, env, stk):
         return invoke(exp, env, stk)
 
     elif IS(exp, Attribute):
-        #print 'Attribute:', exp.value, exp.attr
-        #print env
         t = infer(exp.value, env, stk)
         if t:
             attribs = []

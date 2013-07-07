@@ -152,3 +152,14 @@ def test_huge_dict():
     ps.checkString('import huge_dict')
 
     # should not crash
+
+
+def test_dict_default_value():
+    # exercise
+    ps.checkString('a = {"a": 1}; b = a.get("b", 2);')
+
+    # verify
+    r = find_in_history('b', ps)
+    ut.assertEqual(2, len(r))
+    ut.assertNums([1, 2], r)
+
