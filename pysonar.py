@@ -291,9 +291,12 @@ def flatten(list_of_lists):
     # TODO: handle __iter__ and next()
     flattened = []
     for sublist in list_of_lists:
-        try:
-            flattened.extend([i for i in sublist])
-        except TypeError:
+        if not isinstance(sublist, TypeError):
+            try:
+                flattened.extend([i for i in sublist])
+            except TypeError:
+                flattened.append(sublist)
+        else:
             flattened.append(sublist)
     return flattened
 

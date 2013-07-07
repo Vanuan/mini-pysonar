@@ -64,8 +64,9 @@ class PysonarTest(unittest.TestCase):
 
     def _assertType(self, expected_type, actual_value):
         if not isinstance(actual_value, expected_type):
-            raise AssertionError("Expected type %s but got %s" %
-                                 (expected_type, actual_value))
+            raise AssertionError("Expected type %s but got %s(%s)" %
+                                 (expected_type, type(actual_value),
+                                 actual_value))
 
     def assertNum(self, expected, actual):
         self._assertType(ast.Num, actual)

@@ -73,7 +73,7 @@ r2 = iter_over_list2()
 
     r = find_in_history('r2', ps)
     # unknown type due to unknown list function
-    ut._assertType(ps.UnknownType, r[0])
+    ut._assertType(TypeError, r[0])
 
 
 @as_unit
