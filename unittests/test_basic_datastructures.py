@@ -163,3 +163,26 @@ def test_dict_default_value():
     ut.assertEqual(2, len(r))
     ut.assertNums([1, 2], r)
 
+def test_unhashable_dict_key():
+    # exercise
+    ps.checkString('''a = {b: 1}
+for key, value in a.iteritems():
+    pass''')
+
+
+def test_tuple_unpack():
+    # exercise
+    ps.checkString('''a = {1: 2, 3: 4}
+for key, value in a.iteritems():
+    b = key
+    c = value''')
+
+    # verify
+    r = find_in_history('key', ps)
+    ut.assertEqual(2, len(r))
+    ut.assertNums([1, 3], r)
+
+    r = find_in_history('value', ps)
+    ut.assertEqual(2, len(r))
+    ut.assertNums([2, 4], r)
+

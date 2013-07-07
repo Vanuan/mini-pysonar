@@ -344,7 +344,7 @@ class DictType(Type):
     @staticmethod
     def get_items(dict_):
         '@types: Pair -> list'
-        return [[(pair.fst, pair.snd) for pair in dict_]]
+        return [[TupleType([[pair.fst], pair.snd]) for pair in dict_]]
 
     def __repr__(self):
         return "dict:" + str(self.dict)
@@ -500,22 +500,25 @@ def bind(target, infered_value, env):
                       obj, type(obj))
         return env
 
-    # ignored for now
-    # elif IS(target, Tuple) or IS(target, List):
-    #     if IS(infered_value, TupleType) or IS(infered_value, List):
-    #         if len(target.elts) == len(infered_value.elts):
-    #             for i in xrange(len(infered_value.elts)):
-    #                 env = bind(target.elts[i], infered_value.elts[i], env)
-    #             return env
-    #         elif len(target.elts) < len(infered_value.elts):
-    #             putInfo(target, ValueError('too many values to unpack'))
-    #             return env
-    #         else:
-    #             putInfo(target, ValueError('too few values to unpack'))
-    #             return env
-    #     else:
-    #         putInfo(infered_value, TypeError('non-iterable object'))
-    #         return env
+    elif IS(target, Tuple) or IS(target, List):
+        infered_values = infered_value
+        target_to_value = defaultdict(list)
+        for infered_value in infered_values:
+            if IS(infered_value, TupleType) or IS(infered_value, List):
+                debug('infered key, value:', infered_value)
+                if len(target.elts) == len(infered_value.elts):
+                    for i in xrange(len(infered_value.elts)):
+                        target_to_value[target.elts[i]].extend(infered_value.elts[i])
+                elif len(target.elts) < len(infered_value.elts):
+                    putInfo(target, ValueError('too many values to unpack'))
+                else:
+                    putInfo(target, ValueError('too few values to unpack'))
+            else:
+                putInfo(target, TypeError('non-iterable object'))
+        for key, value in target_to_value.iteritems():
+            debug('binding %s to %s:' % (key, value))
+            env = bind(key, value, env)
+        return env
 
     elif IS(target, ast.Subscript):
         error("Syntax error: Subscript type is not supported in assignment: ",
@@ -1094,11 +1097,15 @@ def infer(exp, env, stk):
         infered_keys = [infer(key, env, stk) for key in exp.keys]
         infered_values = [infer(value, env, stk) for value in exp.values]
         temp_dict = defaultdict(list)
+        dic = nil
         for keys, value in zip(infered_keys, infered_values):
             for key in keys:
-                temp_dict[key] = value  # only the last value
-                                        # with the same key is stored
-        dic = nil
+                try:
+                    temp_dict[key] = value  # only the last value
+                                            # with the same key is stored
+                except TypeError, _:  # unhashable instance
+                    dic = ext(key, value, dic)
+
         for key, value in temp_dict.iteritems():
             dic = ext(key, value, dic)
         return [DictType(dic)]
