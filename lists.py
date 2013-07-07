@@ -53,6 +53,7 @@ class LinkedList:
     def __init__(self, fst, snd):
         self.fst = fst
         self.snd = snd
+        self.__hash_table = {}
 
     def __repr__(self):
         return self.repr_with_limited_recursion(0)
@@ -80,6 +81,11 @@ class LinkedList:
         else:
             return self.fst == other.fst and self.snd == other.snd
 
+    def saveKeyValue(self, key, value):
+        self.__hash_table[key] = value
+
+    def getKey(self, key):
+        return self.__hash_table.get(key)
 
 def first(p):
     return p.fst
@@ -168,7 +174,12 @@ def append(*lists):
 
 
 def assq(x, s):
+    if isinstance(s, Pair):
+        p = s.getKey(x)
+        if p:
+            return p
     for p in s:
+        s.saveKeyValue(first(p), p)
         if x == first(p):
             return p
     return None
