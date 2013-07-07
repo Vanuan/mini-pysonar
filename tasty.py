@@ -1,5 +1,6 @@
+import unittest
 
-from unittest.case import TestCase
+__unittest = True
 import ast
 import pysonar as ps
 import functools
@@ -26,6 +27,9 @@ class GetNodeValue(VisitorByType):
     
     def visit_Str(self, node):
         return node.s
+
+    def visit_str(self, node):
+        return node
     
     def visit_list(self, lst):
         return [self.visit(l) for l in lst]
@@ -49,80 +53,87 @@ def get_dict_with_flattened_values(dict_):
     '@types: DictType -> dict'
     r = {}
     for p in dict_.dict:
-        r[_get_value(p.fst)[0]] = _get_value(p.snd)[0]
+        r[_get_value(p.fst)] = _get_value(p.snd)[0]
     return r
 
 
-class PysonarTest(TestCase):
+class PysonarTest(unittest.TestCase):
 
     def runTest(self):
         pass
-    
-    def _assert(self, expected, actual, msg="Different values"):
-        if expected != actual:
-            raise AssertionError("%s: %s != %s" % (msg, expected, actual))
-    
+
     def _assertType(self, expected_type, actual_value):
         if not isinstance(actual_value, expected_type):
             raise AssertionError("Expected type %s but got %s" %
                                  (expected_type, actual_value))
 
-    
     def assertNum(self, expected, actual):
         self._assertType(ast.Num, actual)
-        self._assert(expected, actual.n)
-    
-    def assertFlattenedList(self, expected, actual):
-        '@types: list, ListType'
-        actual = ps.ListType(flatten(actual.elts))
-        self.assertList(expected, actual)
+        self.assertEqual(expected, actual.n)
+
+    def assertNums(self, expecteds, actuals):
+        for actual in actuals:
+            self._assertType(ast.Num, actual)
+        actuals = sorted([num.n for num in actuals])
+        self.assertEqual(sorted(expecteds), actuals)
+
+    def assertCont(self, expected):
+        self.assertEqual(ps.contType, expected)
 
     def assertList(self, expected, actual):
         '@types: dict, pysonar.ListType'
         self._assertType(ps.ListType, actual)
         actual = actual.elts
-        self._assert(len(expected), lists.length(actual), "Size mismatch")
+        self.assertEqual(len(expected), lists.length(actual), "Size mismatch")
         for i, actual_value in enumerate(actual):
-            self._assert(expected[i], _get_value(actual_value),
+            self.assertEqual(expected[i], _get_value(actual_value),
                          "Different values at index: %s" % i)
 
     def assertDict(self, expected, actual):
         '@types: dict, pysonar.DictType'
         self._assertType(ps.DictType, actual)
         actual = actual.dict
-        self._assert(len(expected), lists.length(actual), "Size mismatch")
+        self.assertEqual(len(expected), lists.length(actual), "Size mismatch")
         for item_pair in actual:
-            keys, values = item_pair.fst, item_pair.snd
-            actual_key = _get_value(keys[0])
+            key, values = item_pair.fst, item_pair.snd
+            actual_key = _get_value(key)
             actual_value = _get_value(values[0])
-            self._assert(expected.get(actual_key), actual_value,
-                         "Different values for the same key: %s" % actual_key)
-            
+            self.assertEqual(expected.get(actual_key), actual_value,
+                         "Value for key '%s': %s != %s, " % (actual_key,
+                                                 expected.get(actual_key),
+                                                 actual_value))
+
+    # TODO how is this different from assertSubDict?
     def assertSubDict(self, expected, actual):
         '@types: dict, pysonar.DictType'
         self._assertType(ps.DictType, actual)
         actual = actual.dict
         for item_pair in actual:
-            keys, values = item_pair.fst, item_pair.snd
-            actual_key = _get_value(keys[0])
-            if expected.has_key(actual_key):
+            key, values = item_pair.fst, item_pair.snd
+            actual_key = _get_value(key)
+            if actual_key in expected:
                 actual_value = _get_value(values[0])
-                self._assert(expected.get(actual_key), actual_value,
+                self.assertEqual(expected.get(actual_key), actual_value,
                              "Different values for the same key: %s" % actual_key)
-                
+
     def assertDictValueAsDict(self, expected, actual_dict, actual_key):
         self._assertType(ps.DictType, actual_dict)
         actual = actual_dict.dict
         for item_pair in actual:
-            keys, values = item_pair.fst, item_pair.snd
-            if actual_key == _get_value(keys[0]):
+            key, values = item_pair.fst, item_pair.snd
+            if actual_key == _get_value(key):
                 actual_value = values[0]
                 self._assertType(ps.DictType, actual_value)
-                self._assert(expected, get_dict_with_flattened_values(actual_value),
+                self.assertEqual(expected, get_dict_with_flattened_values(actual_value),
                              "Different values for the same key: %s" % actual_key)
                 return
         raise AssertionError("Not found '%s' key to compare values in dict"
                              % actual_key)
+
+
+ut = PysonarTest()
+
+
     
 def as_unit(fn):
     @functools.wraps(fn)

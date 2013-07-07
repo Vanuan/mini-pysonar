@@ -52,3 +52,4 @@ def test_import_module_with_func(ut):
     ut.assertTrue(1, len(result.attrs['a']))
     ut.assertTrue(isinstance(result.attrs['a'][0], ps.Closure))
 
+

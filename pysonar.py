@@ -295,6 +295,13 @@ class ListType(Type):
         return not self.__eq__(other)
 
 
+def flatten(list_of_lists):
+    # TODO handle non-iterable types
+    # TODO: handle __iter__ and next()
+    flattened = [item for sublist in list_of_lists for item in sublist]
+    return flattened
+
+
 class DictType(Type):
     
     def __init__(self, dict_):
@@ -308,26 +315,31 @@ class DictType(Type):
                       'iteritems': [self.get_items],
                       'get': [self.get_key]}
         self.iter_operations = (self.get_keys, self.get_values, self.get_items)
-        
+
+    # Since we are not infering body's,
+    # these functions should always return a list:
+
     @staticmethod
     def get_key(dict_, key):
         '@types: Pair, ? -> list'
-        return lists.lookup(key, dict_)
+        # potentially, any value can be returned
+        value = flatten([key_value_pair.snd for key_value_pair in dict_])
+        return value
 
     @staticmethod
     def get_keys(dict_):
         '@types: Pair -> list'
-        return [key_value_pair.fst for key_value_pair in dict_]
+        return [[key_value_pair.fst for key_value_pair in dict_]]
     
     @staticmethod
     def get_values(dict_):
         '@types: Pair -> list'
-        return [key_value_pair.snd for key_value_pair in dict_]
+        return [[key_value_pair.snd for key_value_pair in dict_]]
     
     @staticmethod
     def get_items(dict_):
         '@types: Pair -> list'
-        return [(pair.fst, pair.snd) for pair in dict_]
+        return [[(pair.fst, pair.snd) for pair in dict_]]
 
     def __repr__(self):
         return "dict:" + str(self.dict)
@@ -590,16 +602,16 @@ def invoke1(call, clo, env, stk):
                     types.append(unknown("Callable type %s is not supported" % closure))
             return types
         elif IS(attr.obj, DictType):
-            r = []
+            types = []
             for closure in attr.clo:
                 if closure in attr.obj.iter_operations:
-                    r.append(closure(attr.obj.dict))
+                    types.extend(closure(attr.obj.dict))
                 else:
                     # we take the first version of infered arguments but ideally
                     # all must be processed
                     infered_args = [infer(arg, env, stk) for arg in call.args]
-                    r.append(closure(attr.obj.dict, *infered_args))
-            return r
+                    types.extend(closure(attr.obj.dict, *infered_args))
+            return types
         else:
             err = unknown('AttrType object is not supported for the invoke', attr)
             putInfo(call, err)
@@ -803,32 +815,32 @@ def inferSeq(exp, env, stk):
             return (union([t1, t2, t3]), env3)
 
     elif IS(e, For):
-        infered_iter_values = infer(e.iter, env, stk)
-        for infered_iter_value in infered_iter_values:
-            for value in infered_iter_value:
-                env = bind(e.target, value, env)
-                (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
-                (t2, env2) = inferSeq(e.orelse, close(e.orelse, env), stk)
-        
-                if isTerminating(t1) and isTerminating(t2):                   # both terminates
-                    for e2 in exp[1:]:
-                        putInfo(e2, unknown('unreachable code'))
-                    return (union([t1, t2]), env)
-        
-                elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
-                    (t3, env3) = inferSeq(exp[1:], env2, stk)
-                    t2 = finalize(t2)
-                    return (union([t1, t2, t3]), env3)
-        
-                elif not isTerminating(t1) and isTerminating(t2):             # t2 terminates
-                    (t3, env3) = inferSeq(exp[1:], env1, stk)
-                    t1 = finalize(t1)
-                    return (union([t1, t2, t3]), env3)
-                else:                                                         # both non-terminating
-                    (t3, env3) = inferSeq(exp[1:], mergeEnv(env1, env2), stk)
-                    t1 = finalize(t1)
-                    t2 = finalize(t2)
-                    return (union([t1, t2, t3]), env3)
+        values = infer(e.iter, env, stk)
+        value = flatten(values)
+        print value
+        env = bind(e.target, value, env)
+        (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
+        (t2, env2) = inferSeq(e.orelse, close(e.orelse, env), stk)
+
+        if isTerminating(t1) and isTerminating(t2):                   # both terminates
+            for e2 in exp[1:]:
+                putInfo(e2, unknown('unreachable code'))
+            return (union([t1, t2]), env)
+
+        elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
+            (t3, env3) = inferSeq(exp[1:], env2, stk)
+            t2 = finalize(t2)
+            return (union([t1, t2, t3]), env3)
+
+        elif not isTerminating(t1) and isTerminating(t2):             # t2 terminates
+            (t3, env3) = inferSeq(exp[1:], env1, stk)
+            t1 = finalize(t1)
+            return (union([t1, t2, t3]), env3)
+        else:                                                         # both non-terminating
+            (t3, env3) = inferSeq(exp[1:], mergeEnv(env1, env2), stk)
+            t1 = finalize(t1)
+            t2 = finalize(t2)
+            return (union([t1, t2, t3]), env3)
     
     elif IS(e, Assign):
         t = infer(e.value, env, stk)
@@ -1081,14 +1093,21 @@ def infer(exp, env, stk):
         return exp
     
     elif IS(exp, ast.List):
-        infered_elts = lists.slist([infer(el, env, stk) for el in exp.elts])
+        infered_elts = flatten([infer(el, env, stk) for el in exp.elts])
         return [ListType(infered_elts)]
-    
+
     elif IS(exp, ast.Dict):
         infered_keys = [infer(key, env, stk) for key in exp.keys]
         infered_values = [infer(value, env, stk) for value in exp.values]
-        return [DictType(lists.ziplist(lists.slist(infered_keys),
-                                      lists.slist(infered_values)))]
+        temp_dict = defaultdict(list)
+        for keys, value in zip(infered_keys, infered_values):
+            for key in keys:
+                temp_dict[key] = value  # only the last value
+                                        # with the same key is stored
+        dic = nil
+        for key, value in temp_dict.iteritems():
+            dic = ext(key, value, dic)
+        return [DictType(dic)]
 
     else:
         return [UnknownType(exp)]

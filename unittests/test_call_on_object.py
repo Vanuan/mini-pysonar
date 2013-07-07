@@ -148,15 +148,14 @@ class A:
         return kwargs
  
 a = A()
-result = a.m(keyarg='100')
+result = a.m(keyarg='100', keyarg2='200')
     '''
     ps.checkString(c)
     results = find_in_history('result', ps)
 
     ut.assertEqual(1, len(results))
     result_as_pair = results[0].dict
-    ut.assertEquals('keyarg', result_as_pair.fst.fst)
-    ut.assertEquals('100', result_as_pair.fst.snd[0].s)
+    ut.assertDict({'keyarg': '100', 'keyarg2': '200'}, results[0])
     result_as_pair.fst
 
 

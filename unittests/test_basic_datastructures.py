@@ -5,7 +5,7 @@ Created on Jul 5, 2013
 '''
 
 import pysonar as ps
-from tasty import as_unit, first_in_history
+from tasty import as_unit, first_in_history, find_in_history, PysonarTest, ut
 
 
 @as_unit
@@ -22,9 +22,9 @@ list_with_infering_involved = [1, "b", x]
 '''
     ps.checkString(s)
     ut.assertList([], first_in_history("the_list", ps))
-    ut.assertFlattenedList([1, 2, 3], first_in_history("non_empty_list", ps))
-    ut.assertFlattenedList(["a", "b", "c"], first_in_history("string_list", ps))
-    ut.assertFlattenedList([1, "b", "20"], first_in_history("list_with_infering_involved", ps))
+    ut.assertList([1, 2, 3], first_in_history("non_empty_list", ps))
+    ut.assertList(["a", "b", "c"], first_in_history("string_list", ps))
+    ut.assertList([1, "b", "20"], first_in_history("list_with_infering_involved", ps))
 
 
 @as_unit
@@ -67,12 +67,13 @@ def iter_over_list2():
 r2 = iter_over_list2()
     '''
     ps.checkString(s)
-    r = first_in_history('r', ps)
-    ut.assertNum(1, r)
+    r = find_in_history('r', ps)
+    ut.assertNums([1, 2, 3], r[0:3])
+    ut.assertCont(r[3])
 
-    r = first_in_history('r2', ps)
-    # unknown type due to unknown list function 
-    ut._assertType(ps.UnknownType, r)
+    r = find_in_history('r2', ps)
+    # unknown type due to unknown list function
+    ut._assertType(ps.UnknownType, r[0])
 
 
 @as_unit
@@ -121,15 +122,21 @@ dict_ = {1: 2, 3: 4}
 
 def iter_over_dict_keys():
     for k in dict_.keys():
+        # which element returned is undefined
+        # (actually, it is defined by the order in which keys are iterated,
+        #  which in turn is defined by the hash function, but it's
+        #  too complicated)
+        # we'll assume that any value can be returned
         return dict_.get(k)
-        
+
 new_values = iter_over_dict_keys()
     '''
 
     ps.checkString(s)
-    r = first_in_history('new_values', ps)
-    ut.assertEqual(1, len(r)) 
-    ut.assertNum(2, r[0])
+    r = find_in_history('new_values', ps)
+    ut.assertEqual(3, len(r))
+    ut.assertNums([2, 4], r[0:2])
+    ut.assertCont(r[2])  # represents implicitly returned None
 
 # for k, v in dict_.items():
 
@@ -137,3 +144,11 @@ new_values = iter_over_dict_keys()
 # for k in dict_.keys()
 # for k in dict_
 # for v in dict_.values()
+
+
+def test_huge_dict():
+    ps.addToPythonPath('tests')
+    # exercise
+    ps.checkString('import huge_dict')
+
+    # should not crash
