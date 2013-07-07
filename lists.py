@@ -13,6 +13,11 @@ class PairIterator:
     def next(self):
         if self.p == nil:
             raise StopIteration
+#        elif (not isinstance(self.p, Pair)):
+#            raise StopIteration
+#            ret = self.p.snd
+#            self.p = nil
+#            return ret
         ret = self.p.fst
         self.p = self.p.snd
         return ret
@@ -31,13 +36,20 @@ class Pair:
         self.snd = snd
 
     def __repr__(self):
-        if (self.snd == nil):
-            return "(" + repr(self.fst) + ")"
-        elif (isinstance(self.snd, Pair)):
-            s = repr(self.snd)
-            return "(" + repr(self.fst) + " " + s[1:-1] + ")"
+        return self.repr_with_limited_recursion(0)
+
+    def repr_with_limited_recursion(self, counter):
+        if counter < 100:
+            counter = counter + 1
+            if (self.snd == nil):
+                return "(" + repr(self.fst) + ")"
+            elif (isinstance(self.snd, Pair)):
+                s = self.snd.repr_with_limited_recursion(counter)
+                return "(" + repr(self.fst) + " " + s[1:-1] + ")"
+            else:
+                return "(" + repr(self.fst) + " . " + repr(self.snd) + ")"
         else:
-            return "(" + repr(self.fst) + " . " + repr(self.snd) + ")"
+            return '(Pair.__repr__: max recursion depth exceeded)'
 
     def __iter__(self):
         return PairIterator(self)
