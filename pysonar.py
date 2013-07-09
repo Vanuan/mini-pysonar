@@ -13,7 +13,7 @@ import logging
 from functools import partial
 from itertools import imap
 
-logging.basicConfig(filename="_pysonar.log", level=logging.DEBUG)
+logging.basicConfig(filename="_pysonar.log", level=logging.CRITICAL)
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.WARN)
 
@@ -113,6 +113,12 @@ class UnknownType(Type):
         
     def __repr__(self):
         return "Unknown(%r)" % self.obj
+
+    def __hash__(self):
+        return hash(self.obj.lineno)
+
+    def __eq__(self, other):
+        return self.obj.lineno == other.obj.lineno
     
 
 class PrimType(Type):
@@ -1040,8 +1046,8 @@ def infer(exp, env, stk):
                 t = type(eval(exp.id))     # try use information from Python interpreter
                 return [PrimType(t)]
             except NameError as err:
-                putInfo(exp, err)
-                return [err]
+                putInfo(exp, UnknownType(exp))
+                return [UnknownType(exp)]
 
     elif IS(exp, Lambda):
         c = Closure(exp, env)

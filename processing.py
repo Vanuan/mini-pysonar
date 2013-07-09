@@ -21,6 +21,7 @@ if __name__ == '__main__':
         for constrargs, args, env in val:
             print constrargs, args
             if constrargs:
-                constructor_params[class_name].add(str(constrargs[0]))
+                for first_constructor_arg in constrargs[0]:
+                    constructor_params[class_name].add(first_constructor_arg)
 #            print '\t', constrargs, map(lambda arg: convertName(arg, env), args)
     print constructor_params
