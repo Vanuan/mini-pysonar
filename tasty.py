@@ -1,6 +1,5 @@
 import unittest
 
-__unittest = True
 import ast
 import pysonar as ps
 import functools

@@ -12,7 +12,7 @@ import os
 import logging
 from functools import partial
 
-logging.basicConfig(filename="_pysonar.log", level=logging.DEBUG)
+logging.basicConfig(filename="_pysonar.log", level=logging.ERROR)
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.WARN)
 
@@ -1161,6 +1161,7 @@ def infer(exp, env, stk):
 ##################################################################
 # clean up globals
 def clear():
+    imported_modules.clear()
     history.clear()
     MYDICT.clear()
     global nUnknown

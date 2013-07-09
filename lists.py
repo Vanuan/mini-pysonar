@@ -54,6 +54,12 @@ class LinkedList:
         self.fst = fst
         self.snd = snd
         self.__hash_table = {}
+        if (isinstance(self.snd, Pair) and isinstance(self.fst, Pair)):
+            #print self
+            for p in self:
+                if p != nil:
+                    self.saveKeyValue(first(p), p)
+            #print self.__hash_table
 
     def __repr__(self):
         return self.repr_with_limited_recursion(0)
@@ -82,7 +88,10 @@ class LinkedList:
             return self.fst == other.fst and self.snd == other.snd
 
     def saveKeyValue(self, key, value):
-        self.__hash_table[key] = value
+        try:
+            self.__hash_table[key] = value
+        except TypeError:
+            pass
 
     def getKey(self, key):
         return self.__hash_table.get(key)
@@ -179,7 +188,6 @@ def assq(x, s):
         if p:
             return p
     for p in s:
-        s.saveKeyValue(first(p), p)
         if x == first(p):
             return p
     return None
