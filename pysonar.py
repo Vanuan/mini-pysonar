@@ -25,8 +25,6 @@ warn = partial(_log, logger.warn)
 error = partial(_log, logger.error)
 
 
-
-
 ####################################################################
 ## global parameters
 ####################################################################
@@ -41,6 +39,7 @@ IS = isinstance
 MYDICT = defaultdict(list)
 PYTHONPATH = []
 
+
 ####################################################################
 ## utilities
 ####################################################################
@@ -48,20 +47,21 @@ def iter_fields(node):
     """Iterate over all existing fields, excluding 'ctx'."""
     for field in node._fields:
         try:
-            if field <> 'ctx':
+            if field != 'ctx':
                 yield field, getattr(node, field)
         except AttributeError:
             pass
 
 # for debugging
 
+
 def dp(s):
     return map(dump, parse(s).body)
+
 
 def pf(file_):
     import cProfile
     cProfile.run("sonar(" + file_ + ")", sort="cumulative")
-
 
 
 ####################################################################
@@ -70,18 +70,19 @@ def pf(file_):
 def isAtom(x):
     return type(x) in [int, str, bool, float]
 
+
 def isDef(node):
     return IS(node, FunctionDef) or IS(node, ClassDef)
-
-
 
 
 ##################################################################
 # per-node information store
 ##################################################################
 history = {}
+
+
 def putInfo(exp, item):
-    if history.has_key(exp):
+    if exp in history:
         seen = history[exp]
     else:
         seen = []
@@ -90,8 +91,6 @@ def putInfo(exp, item):
 
 def getInfo(exp):
     return history[exp]
-
-
 
 
 ##################################################################
@@ -103,6 +102,7 @@ class Type:
 
 nUnknown = 0
 
+
 class UnknownType(Type):
     def __init__(self, obj):
         assert obj is not None
@@ -110,7 +110,7 @@ class UnknownType(Type):
 
         global nUnknown
         nUnknown += 1
-        
+
     def __repr__(self):
         return "Unknown(%r)" % self.obj
 
@@ -129,13 +129,16 @@ class UnknownType(Type):
 class PrimType(Type):
     def __init__(self, name):
         self.name = name
+
     def __repr__(self):
         return str(self.name)
+
     def __eq__(self, other):
         if IS(other, PrimType):
             return self.name == other.name
         else:
             return False
+
     def __ne__(self, other):
         return not self.__eq__(other)
 
@@ -153,12 +156,14 @@ class ClassType(Type):
                 continue
             baseClasses = lookup(base.id, env)
             if (baseClasses and len(baseClasses) == 1
-                and IS(baseClasses[0], ClassType)): # limit to one possible type
+                and IS(baseClasses[0], ClassType)):
+                # limit to one possible type
                 baseClass = baseClasses[0]
-                for key,val in baseClass.attrs.iteritems():
+                for key, val in baseClass.attrs.iteritems():
                     self.attrs[key] = val
             else:
-                logger.error('Can\'t infer base of %s: %s %s' % (name, baseClasses, base.id))
+                logger.error('Can\'t infer base of %s: %s %s'
+                             % (name, baseClasses, base.id))
         self.__saveClassAttrs(body)
 
     def __saveClassAttrs(self, body):
@@ -175,7 +180,7 @@ class ClassType(Type):
             return self.name == other.name
         else:
             return False
-    
+
     def __hash__(self):
         return hash(self.ast)
 
@@ -195,7 +200,7 @@ class ObjType(Type):
         self.ast = ast
 
     def __repr__(self):
-        return ("'" + str(self.classtype.name) + "' instance" #+", ctor:" +
+        return ("'" + str(self.classtype.name) + "' instance"  # +", ctor:" +
                 #str(self.ctorargs) + ", attrs:" + str(self.attrs)
                 )
 
@@ -205,17 +210,19 @@ class ObjType(Type):
                     self.attrs == other.attrs)
         else:
             return False
+
     def __ne__(self, other):
         return not self.__eq__(other)
 
     def __hash__(self):
         return hash(self.ast)
 
+
 class FuncType(Type):
     def __init__(self, fromtype, totype):
         self.fromtype = fromtype
         self.totype = totype
-        
+
     def __repr__(self):
         return str(self.fromtype) + " -> " + str(self.totype)
 
@@ -231,7 +238,7 @@ class FuncType(Type):
 class AttrType(Type):
     '''
     This is an analog to Name, just for object attributes
-    
+
     Reference on object attribute value, so binds object with this value while
     name is determined in the context (or environment)
     '''
@@ -246,7 +253,7 @@ class AttrType(Type):
         self.objT = objT
 
     def __repr__(self):
-        clo_repr = ','.join(map(str, IS(self.clo, list) and self.clo or (self.clo,)))
+        clo_repr = ','.join(map(str, self.clo))
         return '(attr "%s", "%s")' % (self.obj, clo_repr)
 
     def __eq__(self, other):
@@ -261,12 +268,14 @@ class AttrType(Type):
     def __hash__(self):
         return hash(tuple(self.clo)) + hash(self.objT)
 
+
 class Closure(Type):
     def __init__(self, func, env):
         '@types: ast.FunctionDef, Pair'
         self.func = func
         self.env = env
         self.defaults = []
+
     def __repr__(self):
         return str(self.func)
 
@@ -274,19 +283,22 @@ class Closure(Type):
 class TupleType(Type):
     def __init__(self, elts):
         self.elts = elts
+
     def __repr__(self):
         return "tup:" + str(self.elts)
+
     def __eq__(self, other):
         if IS(other, TupleType):
-            if len(self.elts) <> len(other.elts):
+            if len(self.elts) != len(other.elts):
                 return False
             else:
                 for i in xrange(len(self.elts)):
-                    if self.elts[i] <> other.elts[i]:
+                    if self.elts[i] != other.elts[i]:
                         return False
                 return True
         else:
             return False
+
     def __ne__(self, other):
         return not self.__eq__(other)
 
@@ -328,7 +340,7 @@ def flatten(list_of_lists):
 
 
 class DictType(Type):
-    
+
     def __init__(self, dict_):
         '@types: Pair'
         self.dict = dict_
@@ -357,12 +369,12 @@ class DictType(Type):
     def get_keys(dict_):
         '@types: Pair -> list'
         return [[key_value_pair.fst for key_value_pair in dict_]]
-    
+
     @staticmethod
     def get_values(dict_):
         '@types: Pair -> list'
         return [[key_value_pair.snd for key_value_pair in dict_]]
-    
+
     @staticmethod
     def get_items(dict_):
         '@types: Pair -> list'
@@ -430,7 +442,6 @@ def union(ts):
     return u
 
 
-
 ####################################################################
 ## type inferencer
 ####################################################################
@@ -438,10 +449,13 @@ class Bind:
     def __init__(self, typ, loc):
         self.typ = typ
         self.loc = loc
+
     def __repr__(self):
         return "(" + str(self.typ) + " <~~ " + str(self.loc) + ")"
+
     def __iter__(self):
         return BindIterator(self)
+
     def __eq__(self, other):
         return (IS(other, Bind) and
                 self.typ == other.typ and
@@ -452,6 +466,7 @@ class BindIterator:
     def __init__(self, p):
         self.p = p
         self.cur = 0
+
     def next(self):
         if self.cur == 2:
             raise StopIteration
@@ -486,7 +501,7 @@ def mergeEnv(env1, env2):
     ret = nil
     for p1 in env1:
         p2 = assq(first(p1), env2)
-        if p2 <> None:
+        if p2 != None:
             ret = ext(first(p1), union([rest(p1), rest(p2)]), ret)
     return ret
 
@@ -570,8 +585,10 @@ def saveMethodInvocationInfo(call, clo, env, stk):
         # TODO save keywords
         MYDICT[clo.obj.classtype.name].append((ctorargs, callargs, env))
 
+
 def getMethodInvocationInfo():
     return MYDICT
+
 
 # invoke one closure
 def invoke1(call, clo, env, stk):
@@ -602,7 +619,7 @@ def invoke1(call, clo, env, stk):
             # we don't really care about this name,
             # we just don't want to collide with method's global symbols
             # TODO: generate a special name,
-            #       that would represent a temporary object 
+            #       that would represent a temporary object
             self_arg = get_self_arg_name(init_closures[0].func)
             ref_to_init = AttrType(init_closures, new_obj, self_arg)
             init_env = ext(self_arg.id, [new_obj], env)
@@ -624,12 +641,15 @@ def invoke1(call, clo, env, stk):
                     # Create new env for method
                     # On each call ClassType.env might be different
                     new_closure = Closure(closure.func, classtype.env)
-                    debug('invoking method', closure.func.name, 'with args', call.args)
-                    types.extend(invokeClosure(call, actualParams, new_closure, env, stk))
+                    debug('invoking method', closure.func.name,
+                          'with args', call.args)
+                    types.extend(invokeClosure(call, actualParams, new_closure,
+                                               env, stk))
                 elif IS(closure, ClassType):
                     types.extend(invoke1(call, closure, env, stk))
                 else:
-                    types.append(TypeError("Callable type %s is not supported" % closure))
+                    types.append(TypeError("Callable type %s is not supported"
+                                           % closure))
             return types
         elif IS(attr.obj, DictType):
             types = []
@@ -637,13 +657,14 @@ def invoke1(call, clo, env, stk):
                 if closure in attr.obj.iter_operations:
                     types.extend(closure(attr.obj.dict))
                 else:
-                    # we take the first version of infered arguments but ideally
-                    # all must be processed
+                    # we take the first version of infered arguments
+                    # but ideally all must be processed
                     infered_args = [infer(arg, env, stk) for arg in call.args]
                     types.extend(closure(attr.obj.dict, *infered_args))
             return types
         else:
-            err = TypeError('AttrType object is not supported for the invoke', attr)
+            err = TypeError('AttrType object is not supported for the invoke',
+                            attr)
             putInfo(call, err)
             return [err]
     return invokeClosure(call, call.args, clo, env, stk)
@@ -699,7 +720,7 @@ def invokeClosure(call, actualParams, clo, env, stk):
     for k in call.keywords:
         ts = infer(k.value, env, stk)
         tloc1 = lookup(k.arg, pos)
-        if tloc1 <> None:
+        if tloc1 != None:
             putInfo(call, TypeError('multiple values for keyword argument',
                                      k.arg, tloc1))
         elif k.arg not in ids:
@@ -709,18 +730,18 @@ def invokeClosure(call, actualParams, clo, env, stk):
 
     # put extras in kwarg or report them
     # bind call.keywords to func.args.kwarg
-    if kwarg <> nil:
-        if func.args.kwarg <> None:
+    if kwarg != nil:
+        if func.args.kwarg != None:
             pos = bind(func.args.kwarg, [DictType(reverse(kwarg))], pos)
         else:
             putInfo(call, TypeError("unexpected keyword arguements", kwarg))
-    elif func.args.kwarg <> None:
+    elif func.args.kwarg != None:
         pos = bind(func.args.kwarg, [DictType(nil)], pos)
 
     # bind defaults, avoid overwriting bound vars
     # types for defaults are already inferred when the function was defined
     i = len(func.args.args) - len(func.args.defaults)
-    ndefaults = len(func.args.args)
+    _ = len(func.args.args)
     for j in xrange(len(clo.defaults)):
         tloc = lookup(getId(func.args.args[i]), pos)
         if tloc == None:
@@ -745,7 +766,6 @@ def invokeClosure(call, actualParams, clo, env, stk):
     return to
 
 
-
 # invoke a union of closures. call invoke1 on each of them and collect
 # their return types into a union
 def invoke(call, env, stk):
@@ -757,8 +777,7 @@ def invoke(call, env, stk):
     return totypes
 
 
-
-# pre-bind names to functions in sequences 
+# pre-bind names to functions in sequences
 def close(code_block, env):
     '''@types: list[ast.AST], Pair -> Pair'''
     for e in code_block:
@@ -773,14 +792,12 @@ def close(code_block, env):
     return env
 
 
-
 def isTerminating(t):
     return not inUnion(contType, t)
 
 
 def finalize(t):
     return removeType(contType, t)
-
 
 
 # infer a sequence of statements
@@ -792,25 +809,25 @@ def inferSeq(exp, env, stk):
 
     e = exp[0]
     if IS(e, If):
-        tt = infer(e.test, env, stk)
+        _ = infer(e.test, env, stk)
         (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
         (t2, env2) = inferSeq(e.orelse, close(e.orelse, env), stk)
 
-        if isTerminating(t1) and isTerminating(t2):                   # both terminates
+        if isTerminating(t1) and isTerminating(t2):          # both terminates
             for e2 in exp[1:]:
                 putInfo(e2, TypeError('unreachable code'))
             return (union([t1, t2]), env)
 
-        elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
+        elif isTerminating(t1) and not isTerminating(t2):    # t1 terminates
             (t3, env3) = inferSeq(exp[1:], env2, stk)
             t2 = finalize(t2)
             return (union([t1, t2, t3]), env3)
 
-        elif not isTerminating(t1) and isTerminating(t2):             # t2 terminates
+        elif not isTerminating(t1) and isTerminating(t2):    # t2 terminates
             (t3, env3) = inferSeq(exp[1:], env1, stk)
             t1 = finalize(t1)
             return (union([t1, t2, t3]), env3)
-        else:                                                         # both non-terminating
+        else:                                            # both non-terminating
             (t3, env3) = inferSeq(exp[1:], mergeEnv(env1, env2), stk)
             t1 = finalize(t1)
             t2 = finalize(t2)
@@ -821,21 +838,21 @@ def inferSeq(exp, env, stk):
         (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
         (t2, env2) = inferSeq(e.orelse, close(e.orelse, env), stk)
 
-        if isTerminating(t1) and isTerminating(t2):                   # both terminates
+        if isTerminating(t1) and isTerminating(t2):          # both terminates
             for e2 in exp[1:]:
                 putInfo(e2, TypeError('unreachable code'))
             return (union([t1, t2]), env)
 
-        elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
+        elif isTerminating(t1) and not isTerminating(t2):   # t1 terminates
             (t3, env3) = inferSeq(exp[1:], env2, stk)
             t2 = finalize(t2)
             return (union([t1, t2, t3]), env3)
 
-        elif not isTerminating(t1) and isTerminating(t2):             # t2 terminates
+        elif not isTerminating(t1) and isTerminating(t2):   # t2 terminates
             (t3, env3) = inferSeq(exp[1:], env1, stk)
             t1 = finalize(t1)
             return (union([t1, t2, t3]), env3)
-        else:                                                         # both non-terminating
+        else:                                            # both non-terminating
             (t3, env3) = inferSeq(exp[1:], mergeEnv(env1, env2), stk)
             t1 = finalize(t1)
             t2 = finalize(t2)
@@ -848,26 +865,26 @@ def inferSeq(exp, env, stk):
         (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
         (t2, env2) = inferSeq(e.orelse, close(e.orelse, env), stk)
 
-        if isTerminating(t1) and isTerminating(t2):                   # both terminates
+        if isTerminating(t1) and isTerminating(t2):           # both terminates
             for e2 in exp[1:]:
                 putInfo(e2, TypeError('unreachable code'))
             return (union([t1, t2]), env)
 
-        elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
+        elif isTerminating(t1) and not isTerminating(t2):    # t1 terminates
             (t3, env3) = inferSeq(exp[1:], env2, stk)
             t2 = finalize(t2)
             return (union([t1, t2, t3]), env3)
 
-        elif not isTerminating(t1) and isTerminating(t2):             # t2 terminates
+        elif not isTerminating(t1) and isTerminating(t2):    # t2 terminates
             (t3, env3) = inferSeq(exp[1:], env1, stk)
             t1 = finalize(t1)
             return (union([t1, t2, t3]), env3)
-        else:                                                         # both non-terminating
+        else:                                           # both non-terminating
             (t3, env3) = inferSeq(exp[1:], mergeEnv(env1, env2), stk)
             t1 = finalize(t1)
             t2 = finalize(t2)
             return (union([t1, t2, t3]), env3)
-    
+
     elif IS(e, Assign):
         t = infer(e.value, env, stk)
         for x in e.targets:
@@ -884,8 +901,8 @@ def inferSeq(exp, env, stk):
         if not cs:
             debug('Function %s not found in scope %s' % (e.name, env))
         for c in cs:
-            c.env = env                          # create circular env to support recursion
-        for d in e.args.defaults:                # infer types for default arguments
+            c.env = env              # create circular env to support recursion
+        for d in e.args.defaults:    # infer types for default arguments
             dt = infer(d, env, stk)
             c.defaults.append(dt)
         return inferSeq(exp[1:], env, stk)
@@ -896,7 +913,7 @@ def inferSeq(exp, env, stk):
         else:
             t1 = infer(e.value, env, stk)
         (t2, env2) = inferSeq(exp[1:], env, stk)
-        for e2 in exp[1:] :
+        for e2 in exp[1:]:
             putInfo(e2, TypeError('unreachable code'))
         return (t1, env)
 
@@ -919,7 +936,7 @@ def inferSeq(exp, env, stk):
             module, module_env = get_module_symbols(name_to_import)
             name_import_as = module_name.asname or module_name.name
             module_class = ClassType('module', [], module.body, module_env, e)
-            module_obj = [ObjType(module_class, [], env, e)]  # probably env is not needed here
+            module_obj = [ObjType(module_class, [], _, e)]
             env = bind(getName(name_import_as, e.lineno), module_obj, env)
         return inferSeq(exp[1:], env, stk)
 
@@ -930,9 +947,6 @@ def inferSeq(exp, env, stk):
         for c in cs:
             c.env = env
 
-        #t1 = cs #infer(e, env, stk)
-        #classPair = append(Pair(e.name, nil), t1)
-        #env = append(env, Pair(classPair, nil))
         (t2, env2) = inferSeq(exp[1:], env, stk)
         return (t2, env2)
 
@@ -945,48 +959,47 @@ def inferSeq(exp, env, stk):
     elif IS(e, TryExcept):
         (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
         (t2, env2) = inferSeq(e.orelse, close(e.orelse, env), stk)
-        (t4, env4) = inferSeq(e.handlers, close(e.handlers, env), stk)
+        (_, _) = inferSeq(e.handlers, close(e.handlers, env), stk)
 
-        if isTerminating(t1) and isTerminating(t2):                   # both terminates
+        if isTerminating(t1) and isTerminating(t2):           # both terminates
             for e2 in exp[1:]:
                 putInfo(e2, TypeError('unreachable code'))
             return (union([t1, t2]), env)
 
-        elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
+        elif isTerminating(t1) and not isTerminating(t2):     # t1 terminates
             (t3, env3) = inferSeq(exp[1:], env2, stk)
             t2 = finalize(t2)
             return (union([t1, t2, t3]), env3)
 
-        elif not isTerminating(t1) and isTerminating(t2):             # t2 terminates
+        elif not isTerminating(t1) and isTerminating(t2):    # t2 terminates
             (t3, env3) = inferSeq(exp[1:], env1, stk)
             t1 = finalize(t1)
             return (union([t1, t2, t3]), env3)
-        else:                                                         # both non-terminating
+        else:                                           # both non-terminating
             (t3, env3) = inferSeq(exp[1:], mergeEnv(env1, env2), stk)
             t1 = finalize(t1)
             t2 = finalize(t2)
             return (union([t1, t2, t3]), env3)
 
-
     elif IS(e, TryFinally):
         (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
         (t2, env2) = inferSeq(e.finalbody, close(e.finalbody, env), stk)
 
-        if isTerminating(t1) and isTerminating(t2):                   # both terminates
+        if isTerminating(t1) and isTerminating(t2):        # both terminates
             for e2 in exp[1:]:
                 putInfo(e2, TypeError('unreachable code'))
             return (union([t1, t2]), env)
 
-        elif isTerminating(t1) and not isTerminating(t2):             # t1 terminates
+        elif isTerminating(t1) and not isTerminating(t2):     # t1 terminates
             (t3, env3) = inferSeq(exp[1:], env2, stk)
             t2 = finalize(t2)
             return (union([t1, t2, t3]), env3)
 
-        elif not isTerminating(t1) and isTerminating(t2):             # t2 terminates
+        elif not isTerminating(t1) and isTerminating(t2):    # t2 terminates
             (t3, env3) = inferSeq(exp[1:], env1, stk)
             t1 = finalize(t1)
             return (union([t1, t2, t3]), env3)
-        else:                                                         # both non-terminating
+        else:                                            # both non-terminating
             (t3, env3) = inferSeq(exp[1:], mergeEnv(env1, env2), stk)
             t1 = finalize(t1)
             t2 = finalize(t2)
@@ -1026,7 +1039,7 @@ def inferSeq(exp, env, stk):
         return inferSeq(exp[1:], env, stk)
     elif IS(e, ast.Delete):
         return inferSeq(exp[1:], env, stk)
-    
+
     elif IS(e, ast.Subscript):
         return inferSeq(exp[1:], env, stk)
 
@@ -1035,7 +1048,6 @@ def inferSeq(exp, env, stk):
 
     else:
         raise TypeError('recognized node in effect context', e)
-
 
 
 # main type inferencer
@@ -1049,28 +1061,28 @@ def infer(exp, env, stk):
 
     elif IS(exp, list):
         env = close(exp, env)
-        (t, ignoreEnv) = inferSeq(exp, env, stk)    # env ignored (out of scope)
+        (t, _) = inferSeq(exp, env, stk)   # env ignored (out of scope)
         return t
 
     elif IS(exp, Num):
         # we need objects, not types
-        return [exp]#[PrimType(type(exp.n))]
+        return [exp]  # [PrimType(type(exp.n))]
 
     elif IS(exp, Str):
         # we need objects, not types
-        return [exp]#[PrimType(type(exp.s))]
+        return [exp]  # [PrimType(type(exp.s))]
 
     elif IS(exp, Name):
         b = lookup(exp.id, env)
         debug('infering name:', b, env)
-        if (b <> None):
+        if (b != None):
             putInfo(exp, b)
             return b
         else:
             try:
-                t = eval(exp.id)     # try use information from Python interpreter
+                t = eval(exp.id)  # try use information from Python interpreter
                 return [PrimType(t)]
-            except NameError as err:
+            except NameError as _:
                 putInfo(exp, UnknownType(exp))
                 return [UnknownType(exp)]
 
@@ -1118,7 +1130,7 @@ def infer(exp, env, stk):
 
     elif IS(exp, ObjType):
         return exp
-    
+
     elif IS(exp, ast.List):
         infered_elts = flatten([infer(el, env, stk) for el in exp.elts])
         return [ListType(tuple(infered_elts))]
@@ -1144,12 +1156,9 @@ def infer(exp, env, stk):
         return [UnknownType(exp)]
 
 
-
 ##################################################################
 # drivers(wrappers)
 ##################################################################
-
-
 # clean up globals
 def clear():
     history.clear()
@@ -1169,8 +1178,8 @@ def nodekey(node):
 def checkExp(exp):
     clear()
     ret = infer(exp, nil, nil)
-    if history.keys() <> [] and logger.isEnabledFor(logging.DEBUG):
-        debug("---------------------------- history ----------------------------")
+    if history.keys() != [] and logger.isEnabledFor(logging.DEBUG):
+        debug("---------------------------- history -------------------------")
         for k in sorted(history.keys(), key=nodekey):
             debug(k, ":", history[k])
         debug("\n")
@@ -1188,7 +1197,7 @@ def checkFile(filename):
 
 
 def parseFile(filename):
-    f = open(filename, 'r');
+    f = open(filename, 'r')
     root_node = createAST(f.read(), filename)
     f.close()
     return root_node
@@ -1213,7 +1222,6 @@ def getModuleExp(modulename):
     except IOError, e:
         warn(str(e))
         return createAST('')
-
 
 
 ###################################################################
@@ -1282,7 +1290,7 @@ def printAst(node):
         ret = "return " + repr(node.value)
     elif (IS(node, Print)):
         ret = ("print(" + (str(node.dest)
-               + ", " if (node.dest!=None) else "")
+               + ", " if (node.dest != None) else "")
                + printList(node.values) + ")")
     elif (IS(node, Expr)):
         ret = "expr:" + str(node.value)
@@ -1300,7 +1308,7 @@ def printAst(node):
         ret = "global:" + str(node.names)
     elif IS(node, Assert):
         ret = "assert " + str(node.test)
-    elif IS(node,list):
+    elif IS(node, list):
         ret = printList(node)
     else:
         ret = str(type(node))
@@ -1332,6 +1340,7 @@ if __name__ == '__main__':
     checkFile(sys.argv[1])
 
 imported_modules = {}
+
 
 def get_module_symbols(name):
     if name in imported_modules:
