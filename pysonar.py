@@ -728,7 +728,7 @@ def invokeClosure(call, actualParams, clo, env, stk):
             i += 1
 
     # finish building the input type
-    fromtype = maplist(lambda p: Pair(first(p), typeOnly(rest(p))), pos)
+    fromtype = maplist(lambda p: SimplePair(first(p), typeOnly(rest(p))), pos)
 
     # check whether the same call site is on stack with same input types
     # if so, we are back to a loop, terminate

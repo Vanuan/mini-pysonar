@@ -2,7 +2,6 @@
 # Copyright (C) 2011 Yin Wang (yinwang0@gmail.com)
 
 
-
 #-------------------------------------------------------------
 # a library for Lisp lists
 #-------------------------------------------------------------
@@ -10,6 +9,7 @@
 class PairIterator:
     def __init__(self, p):
         self.p = p
+
     def next(self):
         if self.p == nil:
             raise StopIteration
@@ -22,13 +22,32 @@ class PairIterator:
         self.p = self.p.snd
         return ret
 
+
 class Nil:
     def __repr__(self):
         return "()"
+
     def __iter__(self):
         return PairIterator(self)
 
 nil = Nil()
+
+
+class SimplePair:
+    def __init__(self, fst, snd):
+        assert not isinstance(fst, Pair)
+        self.fst = fst
+        self.snd = snd
+
+    def __repr__(self):
+        return "(" + repr(self.fst) + " . " + repr(self.snd) + ")"
+
+    def __eq__(self, other):
+        if not isinstance(other, SimplePair):
+            return False
+        else:
+            return self.fst == other.fst and self.snd == other.snd
+
 
 class Pair:
     def __init__(self, fst, snd):
@@ -47,7 +66,7 @@ class Pair:
                 s = self.snd.repr_with_limited_recursion(counter)
                 return "(" + repr(self.fst) + " " + s[1:-1] + ")"
             else:
-                return "(" + repr(self.fst) + " . " + repr(self.snd) + ")"
+                raise Exception('Second argument in Pair should be Pair or nil')
         else:
             return '(Pair.__repr__: max recursion depth exceeded)'
 
@@ -60,8 +79,10 @@ class Pair:
         else:
             return self.fst == other.fst and self.snd == other.snd
 
+
 def first(p):
     return p.fst
+
 
 def rest(p):
     return p.snd
@@ -77,21 +98,25 @@ def foldl(f, x, ls):
         ret = f(ret, y)
     return ret
 
+
 def length(ls):
     ret = 0
-    for x in ls:
+    for _ in ls:
         ret = ret + 1
     return ret
+
 
 def remove(x, ls):
     ret = nil
     for y in ls:
-        if x <> y:
+        if x != y:
             ret = Pair(y, ret)
     return reverse(ret)
 
+
 def assoc(u, v):
     return Pair(Pair(u, v), nil)
+
 
 def slist(pylist):
     '''
@@ -99,8 +124,9 @@ def slist(pylist):
     @types: iterable[T] -> Pair[T, Pair]'''
     ret = nil
     for i in xrange(len(pylist)):
-        ret = Pair(pylist[len(pylist)-i-1], ret)
+        ret = Pair(pylist[len(pylist) - i - 1], ret)
     return ret
+
 
 def pylist(ls):
     ret = []
@@ -131,7 +157,7 @@ def filterlist(f, ls):
     return reverse(ret)
 
 
-def append(*lists):    
+def append(*lists):
     def append1(ls1, ls2):
         ret = ls2
         for x in ls1:
@@ -149,7 +175,7 @@ def assq(x, s):
 
 def ziplist(ls1, ls2):
     ret = nil
-    while ls1 <> nil and ls2 <> nil:
+    while ls1 != nil and ls2 != nil:
         ret = Pair(Pair(first(ls1), first(ls2)), ret)
         ls1 = rest(ls1)
         ls2 = rest(ls2)
@@ -158,13 +184,12 @@ def ziplist(ls1, ls2):
 
 # building association lists
 def ext(x, v, s):
-    return Pair(Pair(x, v), s)
+    return Pair(SimplePair(x, v), s)
 
 
 def lookup(x, s):
     p = assq(x, s)
-    if p <> None:
+    if p != None:
         return rest(p)
     else:
         return None
-
