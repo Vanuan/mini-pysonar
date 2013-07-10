@@ -118,8 +118,13 @@ class UnknownType(Type):
         return hash(self.obj.lineno)
 
     def __eq__(self, other):
-        return self.obj.lineno == other.obj.lineno
-    
+        if IS(other, UnknownType):
+            return self.obj.lineno == other.obj.lineno
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
 
 class PrimType(Type):
     def __init__(self, name):
