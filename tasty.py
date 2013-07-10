@@ -131,6 +131,8 @@ class PysonarTest(unittest.TestCase):
         raise AssertionError("Not found '%s' key to compare values in dict"
                              % actual_key)
 
+    def first_in_history(self, id_):
+        return find_in_history(id_, ps)
 
 ut = PysonarTest()
 

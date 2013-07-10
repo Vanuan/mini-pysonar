@@ -11,9 +11,8 @@ from collections import defaultdict
 import os
 import logging
 from functools import partial
-from itertools import imap
 
-logging.basicConfig(filename="_pysonar.log", level=logging.CRITICAL)
+logging.basicConfig(filename="_pysonar.log", level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.WARN)
 
@@ -105,7 +104,8 @@ class Type:
 nUnknown = 0
 
 class UnknownType(Type):
-    def __init__(self, obj=None):
+    def __init__(self, obj):
+        assert obj is not None
         self.obj = obj
 
         global nUnknown
@@ -141,11 +141,13 @@ class PrimType(Type):
 
 
 class ClassType(Type):
-    def __init__(self, name, bases, body, env):
+    def __init__(self, name, bases, body, env, ast_def_class):
         '@types: str, list[ast.AST], list[ast.AST], Pair'
+        assert IS(name, str)
         self.name = name
         self.env = env
         self.attrs = {}
+        self.ast = ast_def_class
         for base in bases:
             if IS(base, Attribute) or base.id == 'object':
                 continue
@@ -166,27 +168,31 @@ class ClassType(Type):
             self.attrs[pair.fst] = pair.snd
 
     def __repr__(self):
-        return "class:" + self.name
+        return "ClassType:" + str(self.ast)
 
     def __eq__(self, other):
         if IS(other, ClassType):
             return self.name == other.name
         else:
             return False
+    
+    def __hash__(self):
+        return hash(self.ast)
 
     def __ne__(self, other):
         return not self.__eq__(other)
 
 
 class ObjType(Type):
-    def __init__(self, classtype, ctorargs, env):
-        '@types: ClassType, list[Type], Pair'
+    def __init__(self, classtype, ctorargs, env, ast):
+        '@types: ClassType, list[Type], Pair, ast'
         self.classtype = classtype
         self.attrs = {}
         # copy class attributes over to instance
         for name, attr in self.classtype.attrs.iteritems():
             self.attrs[name] = attr
         self.ctorargs = ctorargs
+        self.ast = ast
 
     def __repr__(self):
         return ("'" + str(self.classtype.name) + "' instance" #+", ctor:" +
@@ -202,6 +208,8 @@ class ObjType(Type):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __hash__(self):
+        return hash(self.ast)
 
 class FuncType(Type):
     def __init__(self, fromtype, totype):
@@ -222,6 +230,8 @@ class FuncType(Type):
 
 class AttrType(Type):
     '''
+    This is an analog to Name, just for object attributes
+    
     Reference on object attribute value, so binds object with this value while
     name is determined in the context (or environment)
     '''
@@ -248,6 +258,8 @@ class AttrType(Type):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __hash__(self):
+        return hash(tuple(self.clo)) + hash(self.objT)
 
 class Closure(Type):
     def __init__(self, func, env):
@@ -281,7 +293,7 @@ class TupleType(Type):
 
 class ListType(Type):
     def __init__(self, elts):
-        '@types: Pair'
+        '@types: tuple'
         self.elts = elts
 
     def __repr__(self):
@@ -290,6 +302,9 @@ class ListType(Type):
     def __eq__(self, other):
         return (IS(other, ListType)
                 and self.elts == other.elts)
+
+    def __hash__(self):
+        return hash(self.elts)
 
     def __iter__(self):
         return iter(self.elts)
@@ -581,7 +596,7 @@ def invoke1(call, clo, env, stk):
     if IS(clo, ClassType):
         debug('creating instance of', clo)
         ctorargs = [infer(arg, env, stk) for arg in call.args]
-        new_obj = ObjType(clo, ctorargs, clo.env)
+        new_obj = ObjType(clo, ctorargs, clo.env, call)
         init_closures = new_obj.attrs.get('__init__', [])
         if len(init_closures):
             # we don't really care about this name,
@@ -751,7 +766,7 @@ def close(code_block, env):
             c = Closure(e, nil)
             env = ext(e.name, [c], env)
         elif IS(e, ClassDef):
-            c = ClassType(e.name, e.bases, e.body, nil)
+            c = ClassType(e.name, e.bases, e.body, nil, e)
             env = ext(e.name, [c], env)
         # here we also need Import and Assign
         # Assign is complicated
@@ -876,7 +891,10 @@ def inferSeq(exp, env, stk):
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, Return):
-        t1 = infer(e.value, env, stk)
+        if e.value is None:
+            t1 = [PrimType(None)]
+        else:
+            t1 = infer(e.value, env, stk)
         (t2, env2) = inferSeq(exp[1:], env, stk)
         for e2 in exp[1:] :
             putInfo(e2, TypeError('unreachable code'))
@@ -900,8 +918,8 @@ def inferSeq(exp, env, stk):
             name_to_import = module_name.name
             module, module_env = get_module_symbols(name_to_import)
             name_import_as = module_name.asname or module_name.name
-            module_class = ClassType('module', [], module.body, module_env)
-            module_obj = [ObjType(module_class, [], env)]  # probably env is not needed here
+            module_class = ClassType('module', [], module.body, module_env, e)
+            module_obj = [ObjType(module_class, [], env, e)]  # probably env is not needed here
             env = bind(getName(name_import_as, e.lineno), module_obj, env)
         return inferSeq(exp[1:], env, stk)
 
@@ -1023,7 +1041,9 @@ def inferSeq(exp, env, stk):
 # main type inferencer
 def infer(exp, env, stk):
     '@types: ast.AST|object, Pair, Pair -> list[Type]'
-    debug('infering', exp)
+    debug('infering', exp, exp.__class__)
+    assert exp is not None
+
     if IS(exp, Module):
         return infer(exp.body, env, stk)
 
@@ -1048,7 +1068,7 @@ def infer(exp, env, stk):
             return b
         else:
             try:
-                t = type(eval(exp.id))     # try use information from Python interpreter
+                t = eval(exp.id)     # try use information from Python interpreter
                 return [PrimType(t)]
             except NameError as err:
                 putInfo(exp, UnknownType(exp))
@@ -1101,7 +1121,7 @@ def infer(exp, env, stk):
     
     elif IS(exp, ast.List):
         infered_elts = flatten([infer(el, env, stk) for el in exp.elts])
-        return [ListType(infered_elts)]
+        return [ListType(tuple(infered_elts))]
 
     elif IS(exp, ast.Dict):
         infered_keys = [infer(key, env, stk) for key in exp.keys]
@@ -1128,9 +1148,6 @@ def infer(exp, env, stk):
 ##################################################################
 # drivers(wrappers)
 ##################################################################
-def parseFile(filename):
-    f = open(filename, 'r');
-    return parse(f.read())
 
 
 # clean up globals
@@ -1162,13 +1179,26 @@ def checkExp(exp):
 
 # check a string
 def checkString(s):
-    return checkExp(parse(s))
+    return checkExp(createAST(s))
 
 
 # check a file
 def checkFile(filename):
+    return checkExp(parseFile(filename))
+
+
+def parseFile(filename):
     f = open(filename, 'r');
-    return checkString(f.read())
+    root_node = createAST(f.read(), filename)
+    f.close()
+    return root_node
+
+
+def createAST(string, filename='<string>'):
+    root_node = ast.parse(string)
+    for node in ast.walk(root_node):
+        node.filename = filename
+    return root_node
 
 
 def getModuleExp(modulename):
@@ -1178,13 +1208,11 @@ def getModuleExp(modulename):
     else:
         directory_name = '.'
     try:
-        f = open(os.path.join(directory_name, modulename + '.py'), 'r')
-        s = f.read()
-        f.close()
+        filename = os.path.join(directory_name, modulename + '.py')
+        return parseFile(filename)
     except IOError, e:
         warn(str(e))
-        return parse('')
-    return parse(s)
+        return createAST('')
 
 
 
@@ -1277,7 +1305,9 @@ def printAst(node):
     else:
         ret = str(type(node))
 
-    if hasattr(node, 'lineno'):
+    if hasattr(node, 'lineno') and hasattr(node, 'filename'):
+        if hasattr(node, 'filename'):
+            return ret + '@' + node.filename + ':' + str(node.lineno)
         return (re.sub("@[0-9]+", '', ret)
                 + "@" + str(node.lineno))
     else:

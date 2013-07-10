@@ -11,9 +11,11 @@ def convertName(arg, env):
         return pysonar.lookup(arg.id, env)
     return arg
 
+import cProfile
 
 if __name__ == '__main__':
     pysonar.addToPythonPath(os.path.dirname(sys.argv[1]))
+    #cProfile.run('pysonar.checkFile("' + sys.argv[1] + '")')
     pysonar.checkFile(sys.argv[1])
     constructor_params = defaultdict(set)
     for class_name, val in pysonar.getMethodInvocationInfo().items():
@@ -22,6 +24,7 @@ if __name__ == '__main__':
             print constrargs, args
             if constrargs:
                 for first_constructor_arg in constrargs[0]:
+                    pysonar.debug('first_constructor_arg:', first_constructor_arg.__class__)
                     constructor_params[class_name].add(first_constructor_arg)
 #            print '\t', constrargs, map(lambda arg: convertName(arg, env), args)
     print constructor_params
