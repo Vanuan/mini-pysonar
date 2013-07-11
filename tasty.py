@@ -1,8 +1,8 @@
 import unittest
+__unittest = True
 
 import ast
 import pysonar as ps
-import functools
 import lists
 
 
@@ -57,9 +57,6 @@ def get_dict_with_flattened_values(dict_):
 
 
 class PysonarTest(unittest.TestCase):
-
-    def runTest(self):
-        pass
 
     def _assertType(self, expected_type, actual_value):
         if not isinstance(actual_value, expected_type):
@@ -132,16 +129,6 @@ class PysonarTest(unittest.TestCase):
 
     def first_in_history(self, id_):
         return find_in_history(id_, ps)
-
-ut = PysonarTest()
-
-
-    
-def as_unit(fn):
-    @functools.wraps(fn)
-    def wrapper():
-        return fn(PysonarTest())
-    return wrapper
 
 
 def find_in_history(id_, ps):

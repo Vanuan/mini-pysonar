@@ -1,10 +1,10 @@
 import pysonar
-    
-    
-def test_simple_assignment():
-    #pysonar.checkFile("tests/assign_attribute.py")
-    pysonar.checkFile("tests/assign.py")
+from tasty import PysonarTest
 
-def test_attr_assignment():
-    #pysonar.checkFile("tests/assign_attribute.py")
-    pysonar.checkFile("tests/assign_attribute.py")
+class Test(PysonarTest):
+
+    def test_simple_assignment(self):
+        pysonar.checkFile("tests/assign.py")
+    
+    def test_attr_assignment(self):
+        pysonar.checkFile("tests/assign_attribute.py")
