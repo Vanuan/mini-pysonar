@@ -1150,9 +1150,9 @@ def infer(exp, env, stk):
     elif IS(exp, ObjType):
         return exp
 
-#    elif IS(exp, ast.List):
-#        infered_elts = flatten([infer(el, env, stk) for el in exp.elts])
-#        return [ListType(tuple(infered_elts))]
+    elif IS(exp, ast.List):
+        infered_elts = flatten([infer(el, env, stk) for el in exp.elts])
+        return [ListType(tuple(infered_elts))]
 
     elif IS(exp, ast.Dict):
         infered_keys = [infer(key, env, stk) for key in exp.keys]

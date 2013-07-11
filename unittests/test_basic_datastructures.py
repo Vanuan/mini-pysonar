@@ -6,6 +6,7 @@ Created on Jul 5, 2013
 
 import pysonar as ps
 from tasty import first_in_history, find_in_history, PysonarTest
+from pysonar import contType
 
 
 class Test(PysonarTest):
@@ -55,8 +56,7 @@ class Test(PysonarTest):
 
         ps.checkString(s)
         r = find_in_history('r', ps)
-        self.assertNums([1, 2, 3], r[0:3])
-        self.assertCont(r[3])
+        self.assertNums([1, 2, 3], r, cont=True)
     
         r = find_in_history('r2', ps)
         # unknown type due to unknown list function
@@ -116,8 +116,8 @@ class Test(PysonarTest):
         ps.checkString(s)
         r = find_in_history('new_values', ps)
         self.assertEqual(3, len(r))
-        self.assertNums([2, 4], r[0:2])
-        self.assertCont(r[2])  # represents implicitly returned None
+        self.assertNums([2, 4], r, cont=True)
+        #self.assertCont(r[2])  # represents implicitly returned None
     
     # for k, v in dict_.items():
     

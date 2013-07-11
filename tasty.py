@@ -1,4 +1,5 @@
 import unittest
+from pysonar import contType
 __unittest = True
 
 import ast
@@ -68,11 +69,17 @@ class PysonarTest(unittest.TestCase):
         self._assertType(ast.Num, actual)
         self.assertEqual(expected, actual.n)
 
-    def assertNums(self, expecteds, actuals):
+    def assertNums(self, expecteds, actuals, cont=False):
+        expectedsNew = set(expecteds)
+        if cont:
+            expectedsNew.add(contType)
+        actualsNew = set()
         for actual in actuals:
-            self._assertType(ast.Num, actual)
-        actuals = sorted([num.n for num in actuals])
-        self.assertEqual(sorted(expecteds), actuals)
+            if isinstance(actual, ast.Num):
+                actualsNew.add(actual.n)
+            else:
+                actualsNew.add(actual)
+        self.assertEqual(expectedsNew, actualsNew)
 
     def assertCont(self, expected):
         self.assertEqual(ps.contType, expected)

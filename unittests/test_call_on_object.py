@@ -27,7 +27,7 @@ new_b = B().x(2)
         self.assertEqual(1, len(class_type.attrs))
         
         clo = class_type.attrs.get('x')
-        self.assertTrue(isinstance(clo, list))
+        self.assertTrue(hasattr(clo, '__len__'))
         self.assertTrue(len(clo))
         self.assertTrue(isinstance(clo[0], ps.Closure))
         self.assertEqual([], clo[0].defaults)
