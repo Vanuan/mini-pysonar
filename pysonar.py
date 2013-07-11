@@ -3,9 +3,9 @@
 import sys
 import re
 import ast
-import lists
 from ast import *
-from lists import *
+from lists import lookup, nil, ext, first, rest, assq, reverse, maplist,\
+    SimplePair, append
 
 from collections import defaultdict
 import os
@@ -145,7 +145,7 @@ class PrimType(Type):
 
 class ClassType(Type):
     def __init__(self, name, bases, body, env, ast_def_class):
-        '@types: str, list[ast.AST], list[ast.AST], Pair'
+        '@types: str, list[ast.AST], list[ast.AST], LinkedList'
         assert IS(name, str)
         self.name = name
         self.env = env
@@ -190,7 +190,7 @@ class ClassType(Type):
 
 class ObjType(Type):
     def __init__(self, classtype, ctorargs, env, ast):
-        '@types: ClassType, list[Type], Pair, ast'
+        '@types: ClassType, list[Type], LinkedList, ast'
         self.classtype = classtype
         self.attrs = {}
         # copy class attributes over to instance
@@ -271,7 +271,7 @@ class AttrType(Type):
 
 class Closure(Type):
     def __init__(self, func, env):
-        '@types: ast.FunctionDef, Pair'
+        '@types: ast.FunctionDef, LinkedList'
         self.func = func
         self.env = env
         self.defaults = []
@@ -342,7 +342,7 @@ def flatten(list_of_lists):
 class DictType(Type):
 
     def __init__(self, dict_):
-        '@types: Pair'
+        '@types: LinkedList'
         self.dict = dict_
         self.attrs = {'keys': [self.get_keys],
                       'iterkeys': [self.get_keys],
@@ -358,7 +358,7 @@ class DictType(Type):
 
     @staticmethod
     def get_key(dict_, key, default=None):
-        '@types: Pair, ? -> list'
+        '@types: LinkedList, ? -> list'
         # potentially, any value can be returned
         value = flatten([key_value_pair.snd for key_value_pair in dict_])
         if default:
@@ -367,17 +367,17 @@ class DictType(Type):
 
     @staticmethod
     def get_keys(dict_):
-        '@types: Pair -> list'
+        '@types: LinkedList -> list'
         return [[key_value_pair.fst for key_value_pair in dict_]]
 
     @staticmethod
     def get_values(dict_):
-        '@types: Pair -> list'
+        '@types: LinkedList -> list'
         return [[key_value_pair.snd for key_value_pair in dict_]]
 
     @staticmethod
     def get_items(dict_):
-        '@types: Pair -> list'
+        '@types: LinkedList -> list'
         return [[TupleType([[pair.fst], pair.snd]) for pair in dict_]]
 
     def __repr__(self):
@@ -577,7 +577,7 @@ def onStack(call, args, stk):
 
 def saveMethodInvocationInfo(call, clo, env, stk):
     '''
-    @types: ast.Call, ObjType, Pair, Pair -> None
+    @types: ast.Call, ObjType, LinkedList, LinkedList -> None
     '''
     if call.args:
         ctorargs = [a for a in clo.obj.ctorargs]
@@ -592,7 +592,7 @@ def getMethodInvocationInfo():
 
 # invoke one closure
 def invoke1(call, clo, env, stk):
-    '''@types: ast.Call, Callable, Pair, Pair -> ast.AST or Type
+    '''@types: ast.Call, Callable, LinkedList, LinkedList -> ast.AST or Type
     '''
     if (clo == bottomType):
         return [bottomType]
@@ -685,7 +685,7 @@ def get_self_arg_name(fn_def):
 
 def invokeClosure(call, actualParams, clo, env, stk):
     '''
-    @types: ast.Call, list[ast.AST], Closure, Pair, Pair -> list[Type]
+    @types: ast.Call, list[ast.AST], Closure, LinkedList, LinkedList -> list[Type]
     '''
     debug('invoking closure', clo.func, 'with args', actualParams)
     debug(clo.func.body)
@@ -779,7 +779,7 @@ def invoke(call, env, stk):
 
 # pre-bind names to functions in sequences
 def close(code_block, env):
-    '''@types: list[ast.AST], Pair -> Pair'''
+    '''@types: list[ast.AST], LinkedList -> LinkedList'''
     for e in code_block:
         if IS(e, FunctionDef):
             c = Closure(e, nil)
@@ -936,7 +936,7 @@ def inferSeq(exp, env, stk):
             module, module_env = get_module_symbols(name_to_import)
             name_import_as = module_name.asname or module_name.name
             module_class = ClassType('module', [], module.body, module_env, e)
-            module_obj = [ObjType(module_class, [], _, e)]
+            module_obj = [ObjType(module_class, [], nil, e)]
             env = bind(getName(name_import_as, e.lineno), module_obj, env)
         return inferSeq(exp[1:], env, stk)
 
@@ -1052,7 +1052,7 @@ def inferSeq(exp, env, stk):
 
 # main type inferencer
 def infer(exp, env, stk):
-    '@types: ast.AST|object, Pair, Pair -> list[Type]'
+    '@types: ast.AST|object, LinkedList, LinkedList -> list[Type]'
     debug('infering', exp, exp.__class__)
     assert exp is not None
 

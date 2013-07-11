@@ -6,14 +6,14 @@
 # a library for Lisp lists
 #-------------------------------------------------------------
 
-class PairIterator:
+class ListIterator:
     def __init__(self, p):
         self.p = p
 
     def next(self):
         if self.p == nil:
             raise StopIteration
-#        elif (not isinstance(self.p, Pair)):
+#        elif (not isinstance(self.p, LinkedList)):
 #            raise StopIteration
 #            ret = self.p.snd
 #            self.p = nil
@@ -28,14 +28,14 @@ class Nil:
         return "()"
 
     def __iter__(self):
-        return PairIterator(self)
+        return ListIterator(self)
 
 nil = Nil()
 
 
 class SimplePair:
     def __init__(self, fst, snd):
-        assert not isinstance(fst, Pair)
+        assert not isinstance(fst, LinkedList)
         self.fst = fst
         self.snd = snd
 
@@ -49,7 +49,7 @@ class SimplePair:
             return self.fst == other.fst and self.snd == other.snd
 
 
-class Pair:
+class LinkedList:
     def __init__(self, fst, snd):
         self.fst = fst
         self.snd = snd
@@ -62,19 +62,20 @@ class Pair:
             counter = counter + 1
             if (self.snd == nil):
                 return "(" + repr(self.fst) + ")"
-            elif (isinstance(self.snd, Pair)):
+            elif (isinstance(self.snd, LinkedList)):
                 s = self.snd.repr_with_limited_recursion(counter)
                 return "(" + repr(self.fst) + " " + s[1:-1] + ")"
             else:
-                raise Exception('Second argument in Pair should be Pair or nil')
+                raise Exception('The second argument in LinkedList '
+                                'should be LinkedList or nil')
         else:
-            return '(Pair.__repr__: max recursion depth exceeded)'
+            return '(LinkedList.__repr__: max recursion depth exceeded)'
 
     def __iter__(self):
-        return PairIterator(self)
+        return ListIterator(self)
 
     def __eq__(self, other):
-        if not isinstance(other, Pair):
+        if not isinstance(other, LinkedList):
             return False
         else:
             return self.fst == other.fst and self.snd == other.snd
@@ -89,7 +90,7 @@ def rest(p):
 
 
 def loner(u):
-    return Pair(u, nil)
+    return LinkedList(u, nil)
 
 
 def foldl(f, x, ls):
@@ -110,21 +111,21 @@ def remove(x, ls):
     ret = nil
     for y in ls:
         if x != y:
-            ret = Pair(y, ret)
+            ret = LinkedList(y, ret)
     return reverse(ret)
 
 
 def assoc(u, v):
-    return Pair(Pair(u, v), nil)
+    return LinkedList(LinkedList(u, v), nil)
 
 
 def slist(pylist):
     '''
-    Make linked list using Pair of python list
-    @types: iterable[T] -> Pair[T, Pair]'''
+    Make linked list using LinkedList of python list
+    @types: iterable[T] -> LinkedList[T, LinkedList]'''
     ret = nil
     for i in xrange(len(pylist)):
-        ret = Pair(pylist[len(pylist) - i - 1], ret)
+        ret = LinkedList(pylist[len(pylist) - i - 1], ret)
     return ret
 
 
@@ -138,14 +139,14 @@ def pylist(ls):
 def maplist(f, ls):
     ret = nil
     for x in ls:
-        ret = Pair(f(x), ret)
+        ret = LinkedList(f(x), ret)
     return reverse(ret)
 
 
 def reverse(ls):
     ret = nil
     for x in ls:
-        ret = Pair(x, ret)
+        ret = LinkedList(x, ret)
     return ret
 
 
@@ -153,7 +154,7 @@ def filterlist(f, ls):
     ret = nil
     for x in ls:
         if f(x):
-            ret = Pair(x, ret)
+            ret = LinkedList(x, ret)
     return reverse(ret)
 
 
@@ -161,7 +162,7 @@ def append(*lists):
     def append1(ls1, ls2):
         ret = ls2
         for x in ls1:
-            ret = Pair(x, ret)
+            ret = LinkedList(x, ret)
         return ret
     return foldl(append1, nil, slist(lists))
 
@@ -176,7 +177,7 @@ def assq(x, s):
 def ziplist(ls1, ls2):
     ret = nil
     while ls1 != nil and ls2 != nil:
-        ret = Pair(Pair(first(ls1), first(ls2)), ret)
+        ret = LinkedList(LinkedList(first(ls1), first(ls2)), ret)
         ls1 = rest(ls1)
         ls2 = rest(ls2)
     return reverse(ret)
@@ -184,7 +185,7 @@ def ziplist(ls1, ls2):
 
 # building association lists
 def ext(x, v, s):
-    return Pair(SimplePair(x, v), s)
+    return LinkedList(SimplePair(x, v), s)
 
 
 def lookup(x, s):
