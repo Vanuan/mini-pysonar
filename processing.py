@@ -11,9 +11,10 @@ def convertName(arg, env):
         return pysonar.lookup(arg.id, env)
     return arg
 
-import cProfile
+#import cProfile
 
 if __name__ == '__main__':
+    print sys.argv
     pysonar.addToPythonPath(os.path.dirname(sys.argv[1]))
     #cProfile.run('pysonar.checkFile("' + sys.argv[1] + '")')
     pysonar.checkFile(sys.argv[1])

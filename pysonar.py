@@ -141,6 +141,8 @@ class PrimType(Type):
 
     def __ne__(self, other):
         return not self.__eq__(other)
+    def __hash__(self):
+        return hash(self.name)
 
 
 class ClassType(Type):
@@ -234,6 +236,11 @@ class FuncType(Type):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __hash__(self):
+        # print self.fromtype, self.totype
+        hash1 = hash(tuple(self.fromtype))
+        hash2 = hash(tuple(self.totype))
+        return hash1 + hash2 
 
 class AttrType(Type):
     '''
@@ -247,7 +254,7 @@ class AttrType(Type):
         @param: objT is a value of ast.Attribute
         '''
         # self.env = closure.env
-        assert IS(closures, list)
+        assert IS(closures, (list, tuple))
         self.clo = closures
         self.obj = o
         self.objT = objT
@@ -392,6 +399,11 @@ class DictType(Type):
     def __ne__(self, other):
         return not self.__eq__(other)
 
+    def __hash__(self):
+        try:
+            return hash(self.dict.fst)
+        except:
+            return hash(self.dict)
 
 class UnionType(Type):
     def __init__(self, elts):
@@ -430,16 +442,22 @@ def subtypeBindings(rec1, rec2):
 
 
 def union(ts):
-    u = []
+    u = set()
     for t in ts:
-        if IS(t, list):                 # already a union (list)
+        if IS(t, (list, tuple)):                 # already a union (list)
             for b in t:
-                if b not in u:
-                    u.append(b)
+                #print b.__class__
+                if b:
+                    u.add(b)
+                #if b not in u:
+                #    u.append(b)
         else:
-            if t not in u:
-                u.append(t)
-    return u
+            if t:
+                #print t.__class__
+                u.add(t)
+            #if t not in u:
+            #    u.append(t)
+    return list(u)
 
 
 ####################################################################
@@ -773,7 +791,7 @@ def invoke(call, env, stk):
     totypes = []
     for clo in clos:
         t = invoke1(call, clo, env, stk)
-        totypes = totypes + t
+        totypes = totypes + list(t)
     return totypes
 
 

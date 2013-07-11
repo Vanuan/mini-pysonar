@@ -37,7 +37,10 @@ class SimplePair:
     def __init__(self, fst, snd):
         assert not isinstance(fst, LinkedList)
         self.fst = fst
-        self.snd = snd
+        if snd:
+            self.snd = tuple(snd)
+        else:
+            self.snd = snd
 
     def __repr__(self):
         return "(" + repr(self.fst) + " . " + repr(self.snd) + ")"
@@ -47,6 +50,8 @@ class SimplePair:
             return False
         else:
             return self.fst == other.fst and self.snd == other.snd
+    def __hash__(self):
+        return hash(self.fst) + hash(self.snd)
 
 
 class LinkedList:
@@ -54,7 +59,7 @@ class LinkedList:
         self.fst = fst
         self.snd = snd
         self.__hash_table = {}
-        if (isinstance(self.snd, Pair) and isinstance(self.fst, Pair)):
+        if (isinstance(self.snd, SimplePair) and isinstance(self.fst, SimplePair)):
             #print self
             for p in self:
                 if p != nil:
@@ -183,7 +188,7 @@ def append(*lists):
 
 
 def assq(x, s):
-    if isinstance(s, Pair):
+    if isinstance(s, LinkedList):
         p = s.getKey(x)
         if p:
             return p
