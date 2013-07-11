@@ -312,6 +312,9 @@ class TupleType(Type):
 
 
 class ListType(Type):
+    '''
+    To lower performance impact, let's store only unique values in the list
+    '''
     def __init__(self, elts):
         '@types: tuple'
         self.elts = elts
@@ -444,21 +447,30 @@ def subtypeBindings(rec1, rec2):
 
 def union(ts):
     u = set()
+    listTypeElts = set()
+    list_is_present = False
     for t in ts:
         if IS(t, (list, tuple)):                 # already a union (list)
             for b in t:
-                #print b.__class__
-                if b:
-                    u.add(b)
-                #if b not in u:
-                #    u.append(b)
+                list_is_present = list_is_present or merge(b, u, listTypeElts)
         else:
-            if t:
-                #print t.__class__
-                u.add(t)
-            #if t not in u:
-            #    u.append(t)
-    return list(u)
+            list_is_present = list_is_present or merge(t, u, listTypeElts)
+    if list_is_present:
+        u.add(ListType(tuple(listTypeElts)))
+    return tuple(u)
+
+
+def merge(element, typesset, listtypeset):
+    list_is_present = False
+    if element:
+        if IS(element, ListType):
+            list_is_present = True
+            listtypeset.update(element.elts)
+        else:
+            typesset.add(element)
+    return list_is_present
+
+    
 
 
 ####################################################################

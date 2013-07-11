@@ -25,6 +25,13 @@ class Test(PysonarTest):
         self.assertList(["a", "b", "c"], first_in_history("string_list", ps))
         self.assertList([1, "b", "20"], first_in_history("list_with_infering_involved", ps))
     
+
+    def test_list_of_lists(self):
+        s = ('''def fun(): return [[1, 2]]\nthe_list = fun()''')
+
+        ps.checkString(s)
+        self.assertList(((1,2),), first_in_history("the_list", ps))
+
     
     def test_dict_initializator(self):
         'Dictionary literal support'
@@ -60,7 +67,7 @@ class Test(PysonarTest):
     
         r = find_in_history('r2', ps)
         # unknown type due to unknown list function
-        self._assertType(TypeError, r[0])
+        self.assertList([TypeError], r, cont=True)
     
     
     def _test_dict_iteration_by_keys(self):

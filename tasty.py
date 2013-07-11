@@ -69,29 +69,39 @@ class PysonarTest(unittest.TestCase):
         self._assertType(ast.Num, actual)
         self.assertEqual(expected, actual.n)
 
-    def assertNums(self, expecteds, actuals, cont=False):
+    def assertSet(self, expecteds, actuals, getValue, cont=False):
         expectedsNew = set(expecteds)
         if cont:
             expectedsNew.add(contType)
         actualsNew = set()
         for actual in actuals:
-            if isinstance(actual, ast.Num):
-                actualsNew.add(actual.n)
-            else:
-                actualsNew.add(actual)
+            actualsNew.add(getValue(actual))
         self.assertEqual(expectedsNew, actualsNew)
+
+    def assertNums(self, expecteds, actuals, cont=False):
+        def getValue(actual):
+            if isinstance(actual, ast.Num):
+                return actual.n
+            else:
+                return actual
+        self.assertSet(expecteds, actuals, getValue, cont)
 
     def assertCont(self, expected):
         self.assertEqual(ps.contType, expected)
 
-    def assertList(self, expected, actual):
+    def assertList(self, expected, actual, cont=False):
         '@types: dict, pysonar.ListType'
         self._assertType(ps.ListType, actual)
         actual = actual.elts
         self.assertEqual(len(expected), lists.length(actual), "Size mismatch")
-        for i, actual_value in enumerate(actual):
-            self.assertEqual(expected[i], _get_value(actual_value),
-                         "Different values at index: %s" % i)
+        def getValue(actual):
+            if isinstance(actual, ast.Num):
+                return actual.n
+            if isinstance(actual, ast.Str):
+                return actual.s
+            else:
+                return actual
+        self.assertSet(expected, actual, _get_value, cont)
 
     def assertDict(self, expected, actual):
         '@types: dict, pysonar.DictType'
