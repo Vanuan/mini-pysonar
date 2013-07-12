@@ -343,7 +343,7 @@ def flatten(list_of_lists):
         if not isinstance(sublist, TypeError):
             try:
                 flattened.extend([i for i in sublist])
-            except TypeError:
+            except TypeError, e:
                 flattened.append(sublist)
         else:
             flattened.append(sublist)
@@ -488,7 +488,7 @@ class Bind:
         return "(" + str(self.typ) + " <~~ " + str(self.loc) + ")"
 
     def __iter__(self):
-        return BindIterator(self)
+        return self.typ.elts.__iter__()#BindIterator(self)
 
     def __eq__(self, other):
         return (IS(other, Bind) and
@@ -615,6 +615,9 @@ def saveMethodInvocationInfo(call, clo, env, stk):
     '''
     if call.args:
         ctorargs = [a for a in clo.obj.ctorargs]
+        # here we do redundant inference of arguments,
+        # but there seems to be no other simple way
+        # to save both class name and infered arguments
         callargs = [infer(arg, env, stk) for arg in call.args]
         # TODO save keywords
         MYDICT[clo.obj.classtype.name].append((ctorargs, callargs, env))
@@ -684,7 +687,7 @@ def invoke1(call, clo, env, stk):
                 else:
                     types.append(TypeError("Callable type %s is not supported"
                                            % closure))
-            return types
+            return tuple(types)
         elif IS(attr.obj, DictType):
             types = []
             for closure in attr.clo:
@@ -700,7 +703,7 @@ def invoke1(call, clo, env, stk):
             err = TypeError('AttrType object is not supported for the invoke',
                             attr)
             putInfo(call, err)
-            return [err]
+            return (err,)
     return invokeClosure(call, call.args, clo, env, stk)
 
 
@@ -807,8 +810,8 @@ def invoke(call, env, stk):
     totypes = []
     for clo in clos:
         t = invoke1(call, clo, env, stk)
-        totypes = totypes + list(t)
-    return totypes
+        totypes.extend(t)
+    return tuple(totypes)
 
 
 # pre-bind names to functions in sequences
@@ -943,7 +946,7 @@ def inferSeq(exp, env, stk):
 
     elif IS(e, Return):
         if e.value is None:
-            t1 = [PrimType(None)]
+            t1 = (PrimType(None),)
         else:
             t1 = infer(e.value, env, stk)
         (t2, env2) = inferSeq(exp[1:], env, stk)
@@ -1100,11 +1103,11 @@ def infer(exp, env, stk):
 
     elif IS(exp, Num):
         # we need objects, not types
-        return [exp]  # [PrimType(type(exp.n))]
+        return (exp,)  # [PrimType(type(exp.n))]
 
     elif IS(exp, Str):
         # we need objects, not types
-        return [exp]  # [PrimType(type(exp.s))]
+        return (exp,)  # [PrimType(type(exp.s))]
 
     elif IS(exp, Name):
         b = lookup(exp.id, env)
@@ -1118,7 +1121,7 @@ def infer(exp, env, stk):
                 return [PrimType(t)]
             except NameError as _:
                 putInfo(exp, UnknownType(exp))
-                return [UnknownType(exp)]
+                return (UnknownType(exp),)
 
     elif IS(exp, Lambda):
         c = Closure(exp, env)
