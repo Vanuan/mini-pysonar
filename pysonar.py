@@ -317,7 +317,7 @@ class ListType(Type):
     '''
     def __init__(self, elts):
         '@types: tuple'
-        self.elts = elts
+        self.elts = tuple(elts)
 
     def __repr__(self):
         return "list:" + str(self.elts)
@@ -480,6 +480,9 @@ class Bind:
     def __init__(self, typ, loc):
         self.typ = typ
         self.loc = loc
+
+    def __hash__(self):
+        return hash(self.loc)
 
     def __repr__(self):
         return "(" + str(self.typ) + " <~~ " + str(self.loc) + ")"
@@ -743,7 +746,7 @@ def invokeClosure(call, actualParams, clo, env, stk):
             ts = []
             for i in xrange(len(func.args.args), len(actualParams)):
                 t = infer(actualParams[i], env, stk)
-                ts = ts + t
+                ts = tuple(ts) + tuple(t)
             pos = bind(func.args.vararg, ts, pos)
 
     # bind keywords, collect kwarg
@@ -1145,12 +1148,12 @@ def infer(exp, env, stk):
             return [UnknownType(exp)]
 
     ## ignore complex types for now
-    # elif IS(exp, List):
-    #     eltTypes = []
-    #     for e in exp.elts:
-    #         t = infer(e, env, stk)
-    #         eltTypes.append(t)
-    #     return [Bind(ListType(eltTypes), exp)]
+    elif IS(exp, List):
+         eltTypes = []
+         for e in exp.elts:
+             t = infer(e, env, stk)
+             eltTypes.append(tuple(t))
+         return [Bind(ListType(eltTypes), exp)]
 
     # elif IS(exp, Tuple):
     #     eltTypes = []
@@ -1162,9 +1165,9 @@ def infer(exp, env, stk):
     elif IS(exp, ObjType):
         return exp
 
-    elif IS(exp, ast.List):
-        infered_elts = flatten([infer(el, env, stk) for el in exp.elts])
-        return [ListType(tuple(infered_elts))]
+#    elif IS(exp, ast.List):
+#        infered_elts = flatten([infer(el, env, stk) for el in exp.elts])
+#        return [ListType(tuple(infered_elts))]
 
     elif IS(exp, ast.Dict):
         infered_keys = [infer(key, env, stk) for key in exp.keys]
