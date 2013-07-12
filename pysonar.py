@@ -470,7 +470,15 @@ def merge(element, typesset, listtypeset):
             typesset.add(element)
     return list_is_present
 
-    
+
+def resolve_attribute(attr_list):
+    resolved = []
+    for attr in attr_list:
+        if IS(attr, AttrType):
+            resolved.extend(resolve_attribute(attr.clo))
+        else:
+            resolved.append(attr)
+    return tuple(resolved)
 
 
 ####################################################################
@@ -618,7 +626,7 @@ def saveMethodInvocationInfo(call, clo, env, stk):
         # here we do redundant inference of arguments,
         # but there seems to be no other simple way
         # to save both class name and infered arguments
-        callargs = [infer(arg, env, stk) for arg in call.args]
+        callargs = [resolve_attribute(infer(arg, env, stk)) for arg in call.args]
         # TODO save keywords
         MYDICT[clo.obj.classtype.name].append((ctorargs, callargs, env))
 

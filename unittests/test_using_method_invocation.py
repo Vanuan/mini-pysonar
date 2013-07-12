@@ -7,7 +7,6 @@ import unittest
 import pysonar
 from textwrap import dedent
 import ast
-from unittest.case import skip
 
 
 class Test(unittest.TestCase):
@@ -92,7 +91,7 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
-    def testMethodCall(self):
+    def testMethodCallAsArgument(self):
         a = dedent("""
         class A():
             def method(self, arg):
@@ -101,6 +100,21 @@ class Test(unittest.TestCase):
             def foo(self, arg):
                 return arg
         A().method(B().foo("simple"))
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    def testAssignAttribute(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        class B():
+            pass
+        b = B()
+        b.attr = "simple"
+        arg = b.attr
+        A().method(arg)
         """)
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
