@@ -7,6 +7,13 @@ import unittest
 import pysonar
 from textwrap import dedent
 import ast
+from unittest.case import skip
+
+class TypeErr:
+    def __eq__(self, other):
+        if isinstance(other, TypeError):
+            return True
+        return NotImplemented
 
 
 class Test(unittest.TestCase):
@@ -115,6 +122,50 @@ class Test(unittest.TestCase):
         b.attr = "simple"
         arg = b.attr
         A().method(arg)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    def testAssignClass(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a_alias = A
+        A().method("simple")
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    @skip("Bug")
+    def testMultipleAssignments(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a = None
+        if True:
+            a = 'a'
+        else:
+            a = 'b'
+        A().method(a)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [(pysonar.PrimType(None), "a", "b")])
+
+    @skip("Feature")
+    def testBasicInheritance(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        class Base():
+            def simple(self):
+                return "simple"
+        class Child(Base):
+            pass
+        a = Child().simple()
+        A().method(a)
         """)
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
