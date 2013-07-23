@@ -169,6 +169,28 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
+    def testStrFormatting(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a = "simple%s" % ""
+        A().method(a)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    def testStrFormattingUnsupported(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a = "simple%s%s" % ("", "")
+        A().method(a)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple%s%s",)])
+
 
 if __name__ == "__main__":
     unittest.main()

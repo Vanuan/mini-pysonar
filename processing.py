@@ -16,6 +16,10 @@ def convertName(arg, env):
 if __name__ == '__main__':
     print sys.argv
     pysonar.addToPythonPath(os.path.dirname(sys.argv[1]))
+    with open('skipped.txt', 'r') as f:
+        for skipped_filename in f.readlines():
+            pysonar.addToIgnoredFiles(skipped_filename.strip())
+
     #cProfile.run('pysonar.checkFile("' + sys.argv[1] + '")')
     pysonar.checkFile(sys.argv[1])
     constructor_params = defaultdict(set)

@@ -43,6 +43,8 @@ IS = isinstance
 #                       ]]
 MYDICT = defaultdict(list)
 PYTHONPATH = []
+FILES_TO_SKIP = set()
+
 
 
 ####################################################################
@@ -661,6 +663,7 @@ def invoke1(call, clo, env, stk):
     if not IS(clo, (Closure, ClassType, AttrType)):
         # infer arguments even if it is not callable
         # (we don't know which method it is)
+        # probably causes infinite recursion
         debug('Unknown function or method, infering arguments', call.args)
         for a in call.args:
             infer(a, env, stk)
@@ -684,7 +687,7 @@ def invoke1(call, clo, env, stk):
             init_env = ext(self_arg.id, [new_obj], env)
             invoke1(call, ref_to_init, init_env, stk)
         return [new_obj]
-    if IS(clo, AttrType):
+    elif IS(clo, AttrType):
         attr = clo
         if IS(attr.obj, ObjType):
             # add self to function call args
@@ -697,13 +700,14 @@ def invoke1(call, clo, env, stk):
             types = []
             for closure in attr.clo:
                 if IS(closure, Closure):
-                    # Create new env for method
-                    # On each call ClassType.env might be different
-                    new_closure = Closure(closure.func, classtype.env)
-                    debug('invoking method', closure.func.name,
-                          'with args', call.args)
-                    types.extend(invokeClosure(call, actualParams, new_closure,
-                                               env, stk))
+                    if closure.func.filename not in FILES_TO_SKIP:
+                        # Create new env for method
+                        # On each call ClassType.env might be different
+                        new_closure = Closure(closure.func, classtype.env)
+                        debug('invoking method', closure.func.name,
+                              'with args', call.args)
+                        types.extend(invokeClosure(call, actualParams, new_closure,
+                                                   env, stk))
                 elif IS(closure, ClassType):
                     types.extend(invoke1(call, closure, env, stk))
                 else:
@@ -726,7 +730,12 @@ def invoke1(call, clo, env, stk):
                             attr)
             putInfo(call, err)
             return (err,)
-    return invokeClosure(call, call.args, clo, env, stk)
+    else:  # Closure
+        if clo.func.filename not in FILES_TO_SKIP:
+            return invokeClosure(call, call.args, clo, env, stk)
+        else:
+            return (TypeError('Skipped', clo.func,
+                              'in', clo.func.filename))
 
 
 def get_self_arg_name(fn_def):
@@ -747,7 +756,8 @@ def invokeClosure(call, actualParams, clo, env, stk):
     @types: ast.Call, list[ast.AST], Closure, LinkedList, LinkedList -> list[Type]
     '''
     debug('invoking closure', clo.func, 'with args', actualParams)
-    debug(clo.func.body)
+
+    debug('closure body:', clo.func.body)
 
     func = clo.func
     fenv = clo.env
@@ -1135,7 +1145,7 @@ def infer(exp, env, stk):
 
     elif IS(exp, Name):
         b = lookup(exp.id, env)
-        debug('infering name:', b, env)
+        debug('infering name:', b)#, env)
         if (b != None):
             putInfo(exp, b)
             return b
@@ -1170,6 +1180,7 @@ def infer(exp, env, stk):
                     attribs.append(AttrType(o.getattr(exp.attr), o, exp.value))
                 else:
                     attribs.append(TypeError('no such attribute', exp.attr))
+            debug("attribute infered:", attribs)
             return attribs
         else:
             return [UnknownType(exp)]
@@ -1213,8 +1224,31 @@ def infer(exp, env, stk):
             dic = ext(key, value, dic)
         return [DictType(dic)]
 
+    if IS(exp, ast.BinOp):
+        return inferBinOp(exp, env, stk)
     else:
         return [UnknownType(exp)]
+
+
+def inferBinOp(exp, env, stk):
+    results = []
+    if IS(exp.op, ast.Mod):
+        lefts = infer(exp.left, env, stk)
+        rights = infer(exp.right, env, stk)
+        for left in lefts:
+            if IS(left, Str):
+                for right in rights:
+                    if IS(right, Str):
+                        results.append(left.s % right.s)
+                    elif IS(right, UnknownType):
+                        results.append(left.s)
+                    else:
+                        results.append(left.s % right)
+            else:
+                results.append(exp)
+    else:
+        results.append(exp)
+    return tuple(results)
 
 
 ##################################################################
@@ -1387,6 +1421,8 @@ def printAst(node):
 def addToPythonPath(dirname):
     PYTHONPATH.append(dirname)
 
+def addToIgnoredFiles(filename):
+    FILES_TO_SKIP.add(filename)
 
 def installPrinter():
     import inspect
