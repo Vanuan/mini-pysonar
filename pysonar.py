@@ -3,7 +3,11 @@
 import sys
 import re
 import ast
-from ast import *
+from ast import parse, ClassDef, FunctionDef, Attribute, Name, List, Tuple,\
+    If, While, For, Assign, AugAssign, Expr, Return, Import, ImportFrom,\
+    Continue, TryExcept, TryFinally, ExceptHandler, Raise, Assert, Module,\
+    Num, Str, Call, Lambda, Break, Global, With, Print, Pass, AST, BinOp,\
+    Compare, Mult, Add
 from lists import lookup, nil, ext, first, rest, assq, reverse, maplist,\
     SimplePair, append
 
