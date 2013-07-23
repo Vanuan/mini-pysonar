@@ -173,6 +173,9 @@ class ClassType(Type):
                              % (name, baseClasses, base.id))
         self.__saveClassAttrs(body)
 
+    def getattr(self, name):
+        return self.attrs.get(name, ())
+
     def __saveClassAttrs(self, body):
         env = close(body, nil)  # {Name.id -> (Closure | ClassType)}
         for pair in env:
@@ -205,6 +208,9 @@ class ObjType(Type):
             self.attrs[name] = attr
         self.ctorargs = ctorargs
         self.ast = ast
+
+    def getattr(self, name):
+        return self.attrs.get(name, ())
 
     def __repr__(self):
         return ("'" + str(self.classtype.name) + "' instance"  # +", ctor:" +
@@ -347,7 +353,7 @@ def flatten(list_of_lists):
         if not isinstance(sublist, TypeError):
             try:
                 flattened.extend([i for i in sublist])
-            except TypeError, e:
+            except TypeError, _:
                 flattened.append(sublist)
         else:
             flattened.append(sublist)
@@ -367,6 +373,10 @@ class DictType(Type):
                       'iteritems': [self.get_items],
                       'get': [self.get_key]}
         self.iter_operations = (self.get_keys, self.get_values, self.get_items)
+
+
+    def getattr(self, name):
+        return self.attrs.get(name, ())
 
     # Since we are not infering body's,
     # these functions should always return a list:
@@ -663,7 +673,7 @@ def invoke1(call, clo, env, stk):
         debug('creating instance of', clo)
         ctorargs = [infer(arg, env, stk) for arg in call.args]
         new_obj = ObjType(clo, ctorargs, clo.env, call)
-        init_closures = new_obj.attrs.get('__init__', [])
+        init_closures = new_obj.getattr('__init__')
         if len(init_closures):
             # we don't really care about this name,
             # we just don't want to collide with method's global symbols
@@ -832,9 +842,11 @@ def close(code_block, env):
     for e in code_block:
         if IS(e, FunctionDef):
             c = Closure(e, nil)
-            env = ext(e.name, [c], env)
         elif IS(e, ClassDef):
-            c = ClassType(e.name, e.bases, e.body, nil, e)
+            # env is needed to infer bases
+            # (maybe it's better to move base inference out of constructor)
+            c = ClassType(e.name, e.bases, e.body, env, e)
+        if IS(e, (FunctionDef, ClassDef)):
             env = ext(e.name, [c], env)
         # here we also need Import and Assign
         # Assign is complicated
@@ -1155,7 +1167,7 @@ def infer(exp, env, stk):
                     attribs.append(TypeError('unknown object', o))
                     continue
                 if exp.attr in o.attrs:
-                    attribs.append(AttrType(o.attrs[exp.attr], o, exp.value))
+                    attribs.append(AttrType(o.getattr(exp.attr), o, exp.value))
                 else:
                     attribs.append(TypeError('no such attribute', exp.attr))
             return attribs
@@ -1164,11 +1176,11 @@ def infer(exp, env, stk):
 
     ## ignore complex types for now
     elif IS(exp, List):
-         eltTypes = []
-         for e in exp.elts:
-             t = infer(e, env, stk)
-             eltTypes.append(tuple(t))
-         return [Bind(ListType(eltTypes), exp)]
+        eltTypes = []
+        for e in exp.elts:
+            t = infer(e, env, stk)
+            eltTypes.append(tuple(t))
+        return [Bind(ListType(eltTypes), exp)]
 
     # elif IS(exp, Tuple):
     #     eltTypes = []

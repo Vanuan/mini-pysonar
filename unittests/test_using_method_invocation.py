@@ -153,7 +153,6 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [(pysonar.PrimType(None), "a", "b")])
 
-    @skip("Feature")
     def testBasicInheritance(self):
         a = dedent("""
         class A():
