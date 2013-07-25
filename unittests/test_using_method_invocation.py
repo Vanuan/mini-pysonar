@@ -33,6 +33,7 @@ class Test(unittest.TestCase):
 
     def assertFirstInvoked(self, class_name, init_args, method_args):
         class_method_invocations = pysonar.getMethodInvocationInfo()[class_name]
+        self.assertTrue(len(class_method_invocations) > 0, 'no method invocations')
         actual_init_args, actual_method_args, _ = class_method_invocations[0]
         
         self.assertEqual(init_args, actual_init_args)
@@ -152,6 +153,36 @@ class Test(unittest.TestCase):
         """)
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [(pysonar.PrimType(None), "a", "b")])
+
+    def testChainedAttribute(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        class B():
+            pass
+        b = B()
+        b.b = B()
+        b.b.b = 'simple'
+        A().method(b.b.b)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    def testChainedAttributeCall(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        class B():
+            pass
+        b = B()
+        b.b = B()
+        b.b.b = A()
+        b.b.b.method("simple")
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
 
     def testBasicInheritance(self):
         a = dedent("""

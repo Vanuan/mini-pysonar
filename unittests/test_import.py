@@ -38,16 +38,16 @@ result = x()
     def test_import_module_with_func(self):
         # set up
         ps.addToPythonPath('tests')
-    
+
         # exercise
         ps.checkString('import func_a')
-    
+
         # verify
         result = first_in_history('func_a', ps)
         self.assertTrue(isinstance(result, ps.ObjType))
         self.assertTrue('a' in result.attrs.keys())
         self.assertTrue(hasattr(result.attrs['a'], '__len__'))
         self.assertTrue(1, len(result.attrs['a']))
-        self.assertTrue(isinstance(result.attrs['a'][0], ps.Closure))
+        self.assertEquals(result.attrs['a'][0].__class__, ps.AttrType)
     
     

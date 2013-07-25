@@ -15,6 +15,7 @@ from collections import defaultdict
 import os
 import logging
 from functools import partial
+import types as types1
 
 logging.basicConfig(filename="_pysonar.log", level=logging.ERROR)
 logger = logging.getLogger(__name__)
@@ -177,6 +178,8 @@ class ClassType(Type):
 
     def getattr(self, name):
         return self.attrs.get(name, ())
+    def hasattr(self, name):
+        return name in self.attrs
 
     def __saveClassAttrs(self, body):
         env = close(body, nil)  # {Name.id -> (Closure | ClassType)}
@@ -207,16 +210,27 @@ class ObjType(Type):
         self.attrs = {}
         # copy class attributes over to instance
         for name, attr in self.classtype.attrs.iteritems():
-            self.attrs[name] = attr
+            closures = filter(lambda attr: IS(attr, Closure), attr)
+            non_closures = filter(lambda attr: not IS(attr, Closure), attr)
+            if closures:
+                # if it is a closure, create an instance method reference
+                self.attrs[name] = (AttrType(closures, self),)
+            if non_closures:
+                self.attrs[name] = non_closures
+
         self.ctorargs = ctorargs
         self.ast = ast
 
     def getattr(self, name):
         return self.attrs.get(name, ())
 
+    def hasattr(self, name):
+        return name in self.attrs
+
     def __repr__(self):
-        return ("'" + str(self.classtype.name) + "' instance"  # +", ctor:" +
-                #str(self.ctorargs) + ", attrs:" + str(self.attrs)
+        return ("'" + str(self.classtype.name) + "' instance"
+                # + ", ctor:" + str(self.ctorargs)
+                # + ", attrs:" + str(self.attrs)
                 )
 
     def __eq__(self, other):
@@ -262,15 +276,13 @@ class AttrType(Type):
     Reference on object attribute value, so binds object with this value while
     name is determined in the context (or environment)
     '''
-    def __init__(self, closures, o, objT):
-        '''@types: list[Closure], ObjType, ast.AST
-        @param: objT is a value of ast.Attribute
+    def __init__(self, closures, o):
+        '''@types: list[Closure], ObjType
         '''
         # self.env = closure.env
         assert IS(closures, (list, tuple))
         self.clo = closures
         self.obj = o
-        self.objT = objT
 
     def __repr__(self):
         clo_repr = ','.join(map(str, self.clo))
@@ -286,7 +298,7 @@ class AttrType(Type):
         return not self.__eq__(other)
 
     def __hash__(self):
-        return hash(tuple(self.clo)) + hash(self.objT)
+        return hash(tuple(self.clo)) + hash(self.obj)
 
 
 class Closure(Type):
@@ -367,45 +379,48 @@ class DictType(Type):
     def __init__(self, dict_):
         '@types: LinkedList'
         self.dict = dict_
-        self.attrs = {'keys': [self.get_keys],
-                      'iterkeys': [self.get_keys],
-                      'values': [self.get_values],
-                      'itervalues': [self.get_values],
-                      'items': [self.get_items],
-                      'iteritems': [self.get_items],
-                      'get': [self.get_key]}
+        self.attrs = {'keys': [AttrType([self.get_keys], self)],
+                      'iterkeys': [AttrType([self.get_keys], self)],
+                      'values': [AttrType([self.get_values], self)],
+                      'itervalues': [AttrType([self.get_values], self)],
+                      'items': [AttrType([self.get_items], self)],
+                      'iteritems': [AttrType([self.get_items], self)],
+                      'get': [AttrType([self.get_key], self)]}
         self.iter_operations = (self.get_keys, self.get_values, self.get_items)
 
 
     def getattr(self, name):
         return self.attrs.get(name, ())
 
+    def hasattr(self, name):
+        return name in self.attrs
+
     # Since we are not infering body's,
     # these functions should always return a list:
 
-    @staticmethod
-    def get_key(dict_, key, default=None):
+    #@staticmethod
+    def get_key(self, key, default=None):
         '@types: LinkedList, ? -> list'
         # potentially, any value can be returned
-        value = flatten([key_value_pair.snd for key_value_pair in dict_])
+        value = flatten([key_value_pair.snd for key_value_pair in self.dict])
         if default:
             value.extend(default)
         return value
 
-    @staticmethod
-    def get_keys(dict_):
+    #@staticmethod
+    def get_keys(self):
         '@types: LinkedList -> list'
-        return [[key_value_pair.fst for key_value_pair in dict_]]
+        return [[key_value_pair.fst for key_value_pair in self.dict]]
 
-    @staticmethod
-    def get_values(dict_):
+    #@staticmethod
+    def get_values(self):
         '@types: LinkedList -> list'
-        return [[key_value_pair.snd for key_value_pair in dict_]]
+        return [[key_value_pair.snd for key_value_pair in self.dict]]
 
-    @staticmethod
-    def get_items(dict_):
+    #@staticmethod
+    def get_items(self):
         '@types: LinkedList -> list'
-        return [[TupleType([[pair.fst], pair.snd]) for pair in dict_]]
+        return [[TupleType([[pair.fst], pair.snd]) for pair in self.dict]]
 
     def __repr__(self):
         return "dict:" + str(self.dict)
@@ -583,13 +598,11 @@ def bind(target, infered_value, env):
         putInfo(target, u)
         return ext(getId(target), u, env)
     elif IS(target, Attribute):
-        ast_name = target.value
-        infered_targets = infer(ast_name, env, nil)
+        attribute_value = target.value
+        infered_targets = infer(attribute_value, env, nil)
         for obj in infered_targets:
             if IS(obj, (ClassType, ObjType)):
                 obj.attrs[target.attr] = infered_value
-            elif IS(obj, AttrType):
-                obj.obj.attrs[target.attr] = infered_value
             else:
                 error("Syntax error: wrong target type in assignment: ",
                       obj, type(obj))
@@ -657,10 +670,9 @@ def invoke1(call, clo, env, stk):
     '''
     if (clo == bottomType):
         return [bottomType]
-
     # Even if operator is not a closure, resolve the
     # arguments for partial information.
-    if not IS(clo, (Closure, ClassType, AttrType)):
+    if not IS(clo, (Closure, ClassType, AttrType, types1.MethodType)):
         # infer arguments even if it is not callable
         # (we don't know which method it is)
         # probably causes infinite recursion
@@ -678,14 +690,7 @@ def invoke1(call, clo, env, stk):
         new_obj = ObjType(clo, ctorargs, clo.env, call)
         init_closures = new_obj.getattr('__init__')
         if len(init_closures):
-            # we don't really care about this name,
-            # we just don't want to collide with method's global symbols
-            # TODO: generate a special name,
-            #       that would represent a temporary object
-            self_arg = get_self_arg_name(init_closures[0].func)
-            ref_to_init = AttrType(init_closures, new_obj, self_arg)
-            init_env = ext(self_arg.id, [new_obj], env)
-            invoke1(call, ref_to_init, init_env, stk)
+            invoke1(call, init_closures[0], env, stk)
         return [new_obj]
     elif IS(clo, AttrType):
         attr = clo
@@ -696,7 +701,15 @@ def invoke1(call, clo, env, stk):
             saveMethodInvocationInfo(call, attr, env, stk)
             # TODO: @staticmethod, @classmethod
             if classtype.name != 'module':
-                actualParams.insert(0, attr.objT)
+                # we don't really care about this name,
+                # we just don't want to collide with method's global symbols
+                # TODO: generate a special name,
+                #       that would represent a temporary object
+                self_arg = get_self_arg_name(attr.clo[0].func)
+                env_with_self = ext(self_arg.id, [attr.obj], env)
+                env = env_with_self
+                # add self to params
+                actualParams.insert(0, self_arg)
             types = []
             for closure in attr.clo:
                 if IS(closure, Closure):
@@ -717,13 +730,12 @@ def invoke1(call, clo, env, stk):
         elif IS(attr.obj, DictType):
             types = []
             for closure in attr.clo:
-                if closure in attr.obj.iter_operations:
-                    types.extend(closure(attr.obj.dict))
-                else:
+                if IS(closure, types1.MethodType):
+                    # print 'invoking method of dict', closure
                     # we take the first version of infered arguments
                     # but ideally all must be processed
                     infered_args = [infer(arg, env, stk) for arg in call.args]
-                    types.extend(closure(attr.obj.dict, *infered_args))
+                    types.extend(closure(*infered_args))
             return types
         else:
             err = TypeError('AttrType object is not supported for the invoke',
@@ -1014,7 +1026,7 @@ def inferSeq(exp, env, stk):
     elif IS(e, ClassDef):
         cs = lookup(e.name, env)
         if not cs:
-            debug('Class def %s not found in scope %s' % (e.name, env))
+            error('Class def %s not found in scope %s' % (e.name, env))
         for c in cs:
             c.env = env
 
@@ -1121,6 +1133,53 @@ def inferSeq(exp, env, stk):
         raise TypeError('recognized node in effect context', e)
 
 
+def get_attribute(exp, inferred_type, attribute_name):
+    attribs = []
+    for obj in inferred_type:
+        if not IS(obj, (ObjType, ClassType, DictType)):
+            # other types doesn't have any attributes for now
+            attribs.append(TypeError('unknown object for getattr', obj))
+        elif obj.hasattr(attribute_name):
+            # get the attribute itself
+            attribs.extend(obj.getattr(attribute_name))
+        else:
+            attribs.append(TypeError('no such attribute', attribute_name))
+    return attribs
+
+
+# recursive function that collects all possible attributes
+# for (inferred_value.attr1.attr2) attribute_stack is ['attr2', 'attr1']
+def apply_attribute_chain(exp, inferred_value, attribute_stack):
+    attribute_name = attribute_stack.pop()
+    current_inferred_values = get_attribute(exp, inferred_value, attribute_name)
+    if attribute_stack:
+        results = []
+        # create a copy to avoid extra popping
+        results.extend(apply_attribute_chain(exp, current_inferred_values, list(attribute_stack)))
+        return results
+    else:
+        return current_inferred_values
+
+
+def infer_attribute(exp, env, stk):
+    value = exp.value
+    attribute_chain = [exp.attr]
+    while(IS(value, Attribute)):  # go to the first non-attribute
+        # save attribute names along the way
+        attribute_chain.append(value.attr)
+        value = value.value
+    inferred_value = infer(value, env, stk)
+    if inferred_value:
+        # apply the attribute chain
+        attribs = []
+        for attrib in apply_attribute_chain(exp, inferred_value, attribute_chain):
+            attribs.append(attrib)
+        debug("attribute infered:", attribs)
+        return attribs
+    else:
+        return [UnknownType(exp)]
+
+
 # main type inferencer
 def infer(exp, env, stk):
     '@types: ast.AST|object, LinkedList, LinkedList -> list[Type]'
@@ -1168,22 +1227,7 @@ def infer(exp, env, stk):
         return invoke(exp, env, stk)
 
     elif IS(exp, Attribute):
-        t = infer(exp.value, env, stk)
-        if t:
-            attribs = []
-            # find attr name in object and return it
-            for o in t:
-                if not IS(o, (ObjType, ClassType, DictType)):
-                    attribs.append(TypeError('unknown object', o))
-                    continue
-                if exp.attr in o.attrs:
-                    attribs.append(AttrType(o.getattr(exp.attr), o, exp.value))
-                else:
-                    attribs.append(TypeError('no such attribute', exp.attr))
-            debug("attribute infered:", attribs)
-            return attribs
-        else:
-            return [UnknownType(exp)]
+        return tuple(infer_attribute(exp, env, stk))
 
     ## ignore complex types for now
     elif IS(exp, List):
@@ -1243,7 +1287,8 @@ def inferBinOp(exp, env, stk):
                     elif IS(right, UnknownType):
                         results.append(left.s)
                     else:
-                        results.append(left.s % right)
+                        #results.append(left.s % right)
+                        pass
             else:
                 results.append(exp)
     else:
