@@ -405,22 +405,22 @@ class DictType(Type):
         value = flatten([key_value_pair.snd for key_value_pair in self.dict])
         if default:
             value.extend(default)
-        return value
+        return tuple(value)
 
     #@staticmethod
     def get_keys(self):
         '@types: LinkedList -> list'
-        return [[key_value_pair.fst for key_value_pair in self.dict]]
+        return tuple([key_value_pair.fst for key_value_pair in self.dict])
 
     #@staticmethod
     def get_values(self):
         '@types: LinkedList -> list'
-        return [[key_value_pair.snd for key_value_pair in self.dict]]
+        return tuple([key_value_pair.snd for key_value_pair in self.dict])
 
     #@staticmethod
     def get_items(self):
         '@types: LinkedList -> list'
-        return [[TupleType([[pair.fst], pair.snd]) for pair in self.dict]]
+        return tuple([TupleType([[pair.fst], pair.snd]) for pair in self.dict])
 
     def __repr__(self):
         return "dict:" + str(self.dict)
