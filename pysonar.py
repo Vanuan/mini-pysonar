@@ -184,7 +184,7 @@ class ClassType(Type):
     def __saveClassAttrs(self, body):
         env = close(body, nil)  # {Name.id -> (Closure | ClassType)}
         for pair in env:
-            # Closure's env will be updated, when invoking AttrType
+            # Closure's env will be updated, when invoking MethodType
             self.attrs[pair.fst] = pair.snd
 
     def __repr__(self):
@@ -214,7 +214,7 @@ class ObjType(Type):
             non_closures = filter(lambda attr: not IS(attr, Closure), attr)
             if closures:
                 # if it is a closure, create an instance method reference
-                self.attrs[name] = (AttrType(closures, self),)
+                self.attrs[name] = (MethodType(closures, self),)
             if non_closures:
                 self.attrs[name] = non_closures
 
@@ -269,7 +269,7 @@ class FuncType(Type):
         hash2 = hash(tuple(self.totype))
         return hash1 + hash2 
 
-class AttrType(Type):
+class MethodType(Type):
     '''
     This is an analog to Name, just for object attributes
 
@@ -379,13 +379,13 @@ class DictType(Type):
     def __init__(self, dict_):
         '@types: LinkedList'
         self.dict = dict_
-        self.attrs = {'keys': [AttrType([self.get_keys], self)],
-                      'iterkeys': [AttrType([self.get_keys], self)],
-                      'values': [AttrType([self.get_values], self)],
-                      'itervalues': [AttrType([self.get_values], self)],
-                      'items': [AttrType([self.get_items], self)],
-                      'iteritems': [AttrType([self.get_items], self)],
-                      'get': [AttrType([self.get_key], self)]}
+        self.attrs = {'keys': [MethodType([self.get_keys], self)],
+                      'iterkeys': [MethodType([self.get_keys], self)],
+                      'values': [MethodType([self.get_values], self)],
+                      'itervalues': [MethodType([self.get_values], self)],
+                      'items': [MethodType([self.get_items], self)],
+                      'iteritems': [MethodType([self.get_items], self)],
+                      'get': [MethodType([self.get_key], self)]}
         self.iter_operations = (self.get_keys, self.get_values, self.get_items)
 
 
@@ -505,7 +505,7 @@ def merge(element, typesset, listtypeset):
 def resolve_attribute(attr_list):
     resolved = []
     for attr in attr_list:
-        if IS(attr, AttrType):
+        if IS(attr, MethodType):
             resolved.extend(resolve_attribute(attr.clo))
         else:
             resolved.append(attr)
@@ -672,7 +672,7 @@ def invoke1(call, clo, env, stk):
         return [bottomType]
     # Even if operator is not a closure, resolve the
     # arguments for partial information.
-    if not IS(clo, (Closure, ClassType, AttrType, types1.MethodType)):
+    if not IS(clo, (Closure, ClassType, MethodType, types1.MethodType)):
         # infer arguments even if it is not callable
         # (we don't know which method it is)
         # probably causes infinite recursion
@@ -692,7 +692,7 @@ def invoke1(call, clo, env, stk):
         if len(init_closures):
             invoke1(call, init_closures[0], env, stk)
         return [new_obj]
-    elif IS(clo, AttrType):
+    elif IS(clo, MethodType):
         attr = clo
         if IS(attr.obj, ObjType):
             # add self to function call args
@@ -738,7 +738,7 @@ def invoke1(call, clo, env, stk):
                     types.extend(closure(*infered_args))
             return types
         else:
-            err = TypeError('AttrType object is not supported for the invoke',
+            err = TypeError('MethodType object is not supported for the invoke',
                             attr)
             putInfo(call, err)
             return (err,)

@@ -52,7 +52,7 @@ class TestAttributeInference(unittest.TestCase):
         self.assertEqual(name, inferred_type.name)
 
     def assertInstanceMethod(self, method_name, class_name, inferred_type):
-        self.assertEqual(pysonar.AttrType, inferred_type.__class__)
+        self.assertEqual(pysonar.MethodType, inferred_type.__class__)
         self.assertEqual(method_name, inferred_type.clo[0].func.name)
 
     def testInferAttribute(self):

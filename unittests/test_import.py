@@ -48,6 +48,6 @@ result = x()
         self.assertTrue('a' in result.attrs.keys())
         self.assertTrue(hasattr(result.attrs['a'], '__len__'))
         self.assertTrue(1, len(result.attrs['a']))
-        self.assertEquals(result.attrs['a'][0].__class__, ps.AttrType)
+        self.assertEquals(result.attrs['a'][0].__class__, ps.MethodType)
     
     
