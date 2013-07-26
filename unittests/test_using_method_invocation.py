@@ -34,7 +34,7 @@ class Test(unittest.TestCase):
     def assertFirstInvoked(self, class_name, init_args, method_args):
         class_method_invocations = pysonar.getMethodInvocationInfo()[class_name]
         self.assertTrue(len(class_method_invocations) > 0, 'no method invocations')
-        actual_init_args, actual_method_args, _ = class_method_invocations[0]
+        actual_init_args, actual_method_args, _, _ = class_method_invocations[0]
         
         self.assertEqual(init_args, actual_init_args)
         self.assertEqual(method_args, actual_method_args)
@@ -126,6 +126,60 @@ class Test(unittest.TestCase):
         """)
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
+
+    def testAssignAttributeInInit(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        class B():
+            def __init__(self):
+                self.attr = "simple"
+        b = B()
+        arg = b.attr
+        A().method(arg)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    def testAssignAttributeAndInvokeMethod(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        class B():
+            def __init__(self, a):
+                self.attr = a
+        a = None
+        a = A()
+        b = B(a)
+        a = b.attr.method('simple1')
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple1",)])
+
+    def testPassActualParameterWithNameSelf(self):
+        a = dedent("""
+        class Test():
+            def method(self, arg):
+                return arg
+
+        class Obj():
+            def __init__(self, factory):
+                self.factory = factory
+
+        class Factory():
+            # factory passes itself to the created objects
+            def factoryMethod(self):
+                return Obj(self)
+            def test(self):
+                Test().method('simple')
+
+        obj = Factory().factoryMethod()
+        obj.factory.test()
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("Test", [], [("simple",)])
 
     def testAssignClass(self):
         a = dedent("""

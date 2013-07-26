@@ -16,8 +16,9 @@ import os
 import logging
 from functools import partial
 import types as types1
+import copy
 
-logging.basicConfig(filename="_pysonar.log", level=logging.ERROR)
+logging.basicConfig(filename="_pysonar.log", level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.WARN)
 
@@ -704,7 +705,8 @@ def invoke1(call, clo, env, stk):
             # TODO: @staticmethod, @classmethod
             if classtype.name != 'module':
                 # we don't really care about this name,
-                # we just don't want to collide with method's global symbols
+                # we just don't want to collide
+                # with names, available in method
                 # TODO: generate a special name,
                 #       that would represent a temporary object
                 self_arg = get_self_arg_name(attr.clo[0].func)
@@ -760,7 +762,9 @@ def get_self_arg_name(fn_def):
         raise ValueError("Bound method has at least one parameter - self")
     arg = fn_def.args.args[0]
     if IS(arg, ast.Name):
-        return arg
+        self_arg = copy.copy(arg)
+        self_arg.id = '__pysonar_self__'
+        return self_arg
     msg = "Method definition %s doesn't have self as first argument"
     raise ValueError(msg % fn_def.name)
 
@@ -1154,6 +1158,8 @@ def get_attribute(exp, inferred_type, attribute_name):
 def apply_attribute_chain(exp, inferred_value, attribute_stack):
     attribute_name = attribute_stack.pop()
     current_inferred_values = get_attribute(exp, inferred_value, attribute_name)
+    debug('apply_attribute_chain:', attribute_name, '=',
+          current_inferred_values)
     if attribute_stack:
         results = []
         # create a copy to avoid extra popping
