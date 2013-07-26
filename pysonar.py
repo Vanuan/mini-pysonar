@@ -269,6 +269,7 @@ class FuncType(Type):
         hash2 = hash(tuple(self.totype))
         return hash1 + hash2 
 
+
 class MethodType(Type):
     '''
     This is an analog to Name, just for object attributes
@@ -286,7 +287,7 @@ class MethodType(Type):
 
     def __repr__(self):
         clo_repr = ','.join(map(str, self.clo))
-        return '(attr "%s", "%s")' % (self.obj, clo_repr)
+        return '(method "%s", "%s")' % (self.obj, clo_repr)
 
     def __eq__(self, other):
         if IS(other, FuncType):
@@ -646,18 +647,19 @@ def onStack(call, args, stk):
     return False
 
 
-def saveMethodInvocationInfo(call, clo, env, stk):
+def saveMethodInvocationInfo(call, method, env, stk):
     '''
-    @types: ast.Call, ObjType, LinkedList, LinkedList -> None
+    @types: ast.Call, MethodType, LinkedList, LinkedList -> None
     '''
     if call.args:
-        ctorargs = [a for a in clo.obj.ctorargs]
+        ctorargs = [a for a in method.obj.ctorargs]
+        method_names = [closure.func.name for closure in method.clo]
         # here we do redundant inference of arguments,
         # but there seems to be no other simple way
         # to save both class name and infered arguments
         callargs = [resolve_attribute(infer(arg, env, stk)) for arg in call.args]
         # TODO save keywords
-        MYDICT[clo.obj.classtype.name].append((ctorargs, callargs, env))
+        MYDICT[method.obj.classtype.name].append((ctorargs, callargs, env, method_names))
 
 
 def getMethodInvocationInfo():
@@ -681,7 +683,7 @@ def invoke1(call, clo, env, stk):
             infer(a, env, stk)
         for k in call.keywords:
             infer(k.value, env, stk)
-        err = TypeError('calling non-callable', clo)
+        err = '?'#TypeError('calling non-callable')#, clo.func.name)
         putInfo(call, err)
         return [err]
     if IS(clo, ClassType):

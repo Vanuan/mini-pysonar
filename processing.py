@@ -25,8 +25,8 @@ if __name__ == '__main__':
     constructor_params = defaultdict(set)
     for class_name, val in pysonar.getMethodInvocationInfo().items():
         print class_name
-        for constrargs, args, env in val:
-            print constrargs, args
+        for constrargs, args, env, method_names in val:
+            print constrargs, method_names, args
             if constrargs:
                 for first_constructor_arg in constrargs[0]:
                     pysonar.debug('first_constructor_arg:', first_constructor_arg.__class__)
