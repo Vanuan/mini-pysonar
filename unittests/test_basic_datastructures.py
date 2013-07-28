@@ -6,7 +6,6 @@ Created on Jul 5, 2013
 
 import pysonar as ps
 from tasty import first_in_history, find_in_history, PysonarTest
-from pysonar import contType
 from unittest.case import skip
 
 

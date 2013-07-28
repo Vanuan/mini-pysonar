@@ -9,6 +9,7 @@ from textwrap import dedent
 import ast
 from unittest.case import skip
 
+
 class TypeErr:
     def __eq__(self, other):
         if isinstance(other, TypeError):
@@ -25,11 +26,14 @@ class Test(unittest.TestCase):
                 return self.n == other
             return NotImplemented
         ast.Num.__eq__ = numEquals
+
         def strEquals(self, other):
             if isinstance(other, str):
                 return self.s == other
             return NotImplemented
         ast.Str.__eq__ = strEquals
+
+        pysonar.addToPythonPath("tests/")
 
     def assertFirstInvoked(self, class_name, init_args, method_args):
         class_method_invocations = pysonar.getMethodInvocationInfo()[class_name]
@@ -223,6 +227,35 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
+    def testAttributeAsArgument(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        class B():
+            pass
+        b = B()
+        b.attr = "simple"
+        A().method(b.attr)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    def testInit(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        class B():
+            def __init__(self):
+                self.attr = "simple"
+        b = B()
+        arg = b.attr
+        A().method(arg)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
     def testChainedAttributeCall(self):
         a = dedent("""
         class A():
@@ -254,6 +287,18 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
+    def testImportWithClass(self):
+        a = dedent("""
+        import class_a
+        class A():
+            def method(self, arg):
+                return arg
+        a = class_a.a()
+        A().method(a.attr)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
     def testStrFormatting(self):
         a = dedent("""
         class A():
@@ -261,6 +306,18 @@ class Test(unittest.TestCase):
                 return arg
         a = "simple%s" % ""
         A().method(a)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    def testImportClassFrom(self):
+        a = dedent("""
+        from class_a import a
+        class A():
+            def method(self, arg):
+                return arg
+        object = a()
+        A().method(object.attr)
         """)
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
@@ -275,6 +332,18 @@ class Test(unittest.TestCase):
         """)
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple%s%s",)])
+
+    @skip("skip for now")
+    def testImportWithConstant(self):
+        a = dedent("""
+        import defines_simple_constant_a
+        class A():
+            def method(self, arg):
+                return arg
+        A().method(defines_simple_constant_a.a)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
 
 
 if __name__ == "__main__":

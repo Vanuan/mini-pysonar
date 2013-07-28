@@ -1,2 +1,3 @@
 class a:
-    pass
+    def __init__(self):
+        self.attr = "simple"
