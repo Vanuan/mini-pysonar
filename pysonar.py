@@ -1,5 +1,6 @@
 # pysonar.py - a Python version of PySonar static analyzer for Python
 # Copyright (C) 2011 Yin Wang (yinwang0@gmail.com)
+# coding=utf-8
 import sys
 import re
 import ast
@@ -279,7 +280,7 @@ class MethodType(Type):
     name is determined in the context (or environment)
     '''
     def __init__(self, closures, o):
-        '''@types: list[Closure], ObjType
+        '''@types: list[Closure], ObjType|DictType
         '''
         # self.env = closure.env
         assert IS(closures, (list, tuple))
@@ -288,7 +289,7 @@ class MethodType(Type):
 
     def __repr__(self):
         clo_repr = ','.join(map(str, self.clo))
-        return '(method "%s", "%s")' % (self.obj, clo_repr)
+        return '(method %s of %s)' % (self.obj.classtype.name, clo_repr)
 
     def __eq__(self, other):
         if IS(other, FuncType):
@@ -319,7 +320,7 @@ class TupleType(Type):
         self.elts = elts
 
     def __repr__(self):
-        return "tup:" + str(self.elts)
+        return "tup:" + repr(self.elts)
 
     def __eq__(self, other):
         if IS(other, TupleType):
@@ -346,7 +347,7 @@ class ListType(Type):
         self.elts = tuple(elts)
 
     def __repr__(self):
-        return "list:" + str(self.elts)
+        return "list:" + repr(self.elts)
 
     def __eq__(self, other):
         return (IS(other, ListType)
@@ -388,6 +389,7 @@ class DictType(Type):
                       'items': [MethodType([self.get_items], self)],
                       'iteritems': [MethodType([self.get_items], self)],
                       'get': [MethodType([self.get_key], self)]}
+        self.classtype = ClassType('dict', [], [], nil, None)
         self.iter_operations = (self.get_keys, self.get_values, self.get_items)
 
 
@@ -425,7 +427,7 @@ class DictType(Type):
         return tuple([TupleType([[pair.fst], pair.snd]) for pair in self.dict])
 
     def __repr__(self):
-        return "dict:" + str(self.dict)
+        return "dict:" + unicode(self.dict)
 
     # any hashable value can be used as keys
     # any object can be used as values
@@ -447,7 +449,7 @@ class UnionType(Type):
         self.elts = elts
 
     def __repr__(self):
-        return "U:" + str(self.elts)
+        return "U:" + unicode(self.elts)
 
 
 # singleton primtive types
@@ -526,7 +528,7 @@ class Bind:
         return hash(self.loc)
 
     def __repr__(self):
-        return "(" + str(self.typ) + " <~~ " + str(self.loc) + ")"
+        return "(" + repr(self.typ) + " <~~ " + repr(self.loc) + ")"
 
     def __iter__(self):
         return self.typ.elts.__iter__()#BindIterator(self)
@@ -1402,39 +1404,40 @@ def printList(ls):
     if (ls == None or ls == []):
         return ""
     elif (len(ls) == 1):
-        return str(ls[0])
+        return repr(ls[0])
     else:
-        return str(ls)
+        return repr(ls)
 
 
 def printAst(node):
+    # WARNING: repr should return a string, not unicode
     if (IS(node, Module)):
-        ret = "module:" + str(node.body)
+        ret = "module:" + repr(node.body)
     elif (IS(node, FunctionDef)):
-        ret = "fun:" + str(node.name)
+        ret = "fun:" + repr(node.name)
     elif (IS(node, ClassDef)):
-        ret = "class:" + str(node.name)
+        ret = "class:" + repr(node.name)
     elif (IS(node, Attribute)):
-        ret = "attribute:" + str(node.value) + "." + str(node.attr)
+        ret = "attribute:" + repr(node.value) + "." + repr(node.attr)
     elif (IS(node, Call)):
-        ret = ("call:" + str(node.func)
+        ret = ("call:" + repr(node.func)
                + ":(" + printList(node.args) + ")")
     elif (IS(node, Assign)):
         ret = ("(" + printList(node.targets)
                + " <- " + printAst(node.value) + ")")
     elif (IS(node, If)):
-        ret = ("if " + str(node.test)
+        ret = ("if " + repr(node.test)
                + ":" + printList(node.body)
                + ":" + printList(node.orelse))
     elif (IS(node, Compare)):
-        ret = (str(node.left) + ":" + printList(node.ops)
+        ret = (repr(node.left) + ":" + printList(node.ops)
                + ":" + printList(node.comparators))
     elif (IS(node, Name)):
         ret = str(node.id)
     elif (IS(node, Num)):
         ret = str(node.n)
     elif (IS(node, Str)):
-        ret = '"' + str(node.s) + '"'
+        ret = repr(node.s)
     elif (IS(node, Return)):
         ret = "return " + repr(node.value)
     elif (IS(node, Print)):
@@ -1461,7 +1464,6 @@ def printAst(node):
         ret = printList(node)
     else:
         ret = str(type(node))
-
     if hasattr(node, 'lineno') and hasattr(node, 'filename'):
         if hasattr(node, 'filename'):
             return ret + '@' + node.filename + ':' + str(node.lineno)
