@@ -238,7 +238,7 @@ class ObjType(Type):
     def __eq__(self, other):
         if IS(other, ObjType):
             return ((self.classtype == other.classtype) and
-                    self.attrs == other.attrs)
+                    self.attrs.keys() == other.attrs.keys())
         else:
             return False
 
