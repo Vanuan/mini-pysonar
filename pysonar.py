@@ -759,7 +759,7 @@ def get_self_arg_name(fn_def):
     @types: ast.FunctionDef -> ast.Name
     '''
     if not fn_def.args.args:
-        raise ValueError("Bound method has at least one parameter - self")
+        raise ValueError("Bound method '%s' should have at least one parameter" % str(fn_def.name))
     arg = fn_def.args.args[0]
     if IS(arg, ast.Name):
         self_arg = copy.copy(arg)
