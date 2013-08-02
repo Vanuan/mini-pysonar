@@ -304,7 +304,7 @@ class MethodType(Type):
 
     def __repr__(self):
         clo_repr = ','.join(map(str, self.clo))
-        return '(method %s of %s)' % (self.obj.classtype.name, clo_repr)
+        return '(method %s of %s)' % (clo_repr, self.obj.classtype.name)
 
     def __eq__(self, other):
         if IS(other, FuncType):
@@ -1052,8 +1052,8 @@ def inferSeq(exp, env, stk):
             error('Class def %s not found in scope %s' % (e.name, env))
         for c in cs:
             c.env = env
-            c.infer_body(stk)  # infer the body only after env is changed
             c.infer_bases()
+            c.infer_body(stk)  # infer the body only after env is changed
 
         (t2, env2) = inferSeq(exp[1:], env, stk)
         return (t2, env2)

@@ -352,11 +352,11 @@ class Test(unittest.TestCase):
             def method(self, arg):
                 return arg
 
-        class Parent():
+        class Klass():
             def method(self, arg):
                 A().method(arg)
 
-        Parent.method(Parent(), 'simple')
+        Klass.method(Klass(), 'simple')
         """)
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
@@ -374,6 +374,26 @@ class Test(unittest.TestCase):
         class Child(Parent):
             def overridden(self, arg):
                 Parent.overridden(self, arg)
+
+        Child().overridden('simple')
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("Child", [], [("simple",)])
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    def testOverrideParentMethod(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+
+        class Parent():
+            def overridden(self, arg):
+                pass
+
+        class Child(Parent):
+            def overridden(self, arg):
+                A().method(arg)
 
         Child().overridden('simple')
         """)
