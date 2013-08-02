@@ -37,7 +37,7 @@ class Test(unittest.TestCase):
 
     def assertFirstInvoked(self, class_name, init_args, method_args):
         class_method_invocations = pysonar.getMethodInvocationInfo()[class_name]
-        self.assertTrue(len(class_method_invocations) > 0, 'no method invocations')
+        self.assertTrue(len(class_method_invocations) > 0, 'no method invocations of %s' % class_name)
         actual_init_args, actual_method_args, _, _ = class_method_invocations[0]
         
         self.assertEqual(init_args, actual_init_args)
@@ -343,6 +343,42 @@ class Test(unittest.TestCase):
         A().method(defines_simple_constant_a.a)
         """)
         pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+
+    def testCallMethodOfClass(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+
+        class Parent():
+            def method(self, arg):
+                A().method(arg)
+
+        Parent.method(Parent(), 'simple')
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    def testCallParentMethod(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+
+        class Parent():
+            def overridden(self, arg):
+                A().method(arg)
+
+        class Child(Parent):
+            def overridden(self, arg):
+                Parent.overridden(self, arg)
+
+        Child().overridden('simple')
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("Child", [], [("simple",)])
         self.assertFirstInvoked("A", [], [("simple",)])
 
 

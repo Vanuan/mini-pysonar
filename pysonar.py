@@ -163,31 +163,46 @@ class ClassType(Type):
         self.env = env
         self.attrs = {}
         self.ast = ast_def_class
+        self.baseClasses = []
         for base in bases:
             if IS(base, Attribute) or base.id == 'object':
                 continue
             baseClasses = lookup(base.id, env)
             if (baseClasses and len(baseClasses) == 1
-                and IS(baseClasses[0], ClassType)):
-                # limit to one possible type
-                baseClass = baseClasses[0]
-                for key, val in baseClass.attrs.iteritems():
-                    self.attrs[key] = val
+                and IS(baseClasses[0], ClassType)):  # limit to one possible type
+                self.baseClasses.extend(baseClasses)
             else:
                 logger.error('Can\'t infer base of %s: %s %s'
                              % (name, baseClasses, base.id))
-        self.__saveClassAttrs(body)
+        if name != 'module' and name != 'dict':
+            assert body  # empty body is not allowed for class
+        self.body = body
+
+    def infer_body(self, stk):
+        if self.name != 'module':
+            self.__saveClassAttrs(self.body, stk)
+        else:
+            for pair in self.env:
+                self.attrs[pair.fst] = pair.snd
+
+    def infer_bases(self):
+        for baseClass in self.baseClasses:
+            for key, val in baseClass.attrs.iteritems():
+                self.attrs[key] = val
 
     def getattr(self, name):
         return self.attrs.get(name, ())
     def hasattr(self, name):
         return name in self.attrs
 
-    def __saveClassAttrs(self, body):
-        env = close(body, nil)  # {Name.id -> (Closure | ClassType)}
-        for pair in env:
+    def __saveClassAttrs(self, body, stk):
+        # infer body
+        local_env = close(body, nil)  # {Name.id -> (Closure | ClassType)}
+        mixed_env = close(body, self.env)
+        _, mixed_env = inferSeq(body, mixed_env, stk)  # Closure's env will be updated,
+        for pair in local_env:
             # Closure's env will be updated, when invoking MethodType
-            self.attrs[pair.fst] = pair.snd
+            self.attrs[pair.fst] = lookup(pair.fst, mixed_env)
 
     def __repr__(self):
         return "ClassType:" + str(self.ast)
@@ -720,12 +735,9 @@ def invoke1(call, clo, env, stk):
             for closure in attr.clo:
                 if IS(closure, Closure):
                     if closure.func.filename not in FILES_TO_SKIP:
-                        # Create new env for method
-                        # On each call ClassType.env might be different
-                        new_closure = Closure(closure.func, classtype.env)
                         debug('invoking method', closure.func.name,
                               'with args', call.args)
-                        types.extend(invokeClosure(call, actualParams, new_closure,
+                        types.extend(invokeClosure(call, actualParams, closure,
                                                    env, stk))
                 elif IS(closure, ClassType):
                     types.extend(invoke1(call, closure, env, stk))
@@ -878,7 +890,16 @@ def close(code_block, env):
             c = ClassType(e.name, e.bases, e.body, env, e)
         if IS(e, (FunctionDef, ClassDef)):
             env = ext(e.name, [c], env)
-        # here we also need Import and Assign
+        if IS(e, (Import)):
+            for module_name in e.names:
+                name_to_import = module_name.name
+                module, module_env = get_module_symbols(name_to_import)
+                name_import_as = module_name.asname or module_name.name
+                module_class = ClassType('module', [], module.body, module_env, e)
+                module_class.infer_body(nil)
+                module_obj = [ObjType(module_class, [], nil, e)]
+                env = bind(getName(name_import_as, e.lineno), module_obj, env)
+        # TODO: here we also need ImportFrom and Assign
         # Assign is complicated
     return env
 
@@ -1018,17 +1039,11 @@ def inferSeq(exp, env, stk):
             name_to_import = module_name.name
             name_import_as = module_name.asname or name_to_import
             module_symbol = lookup(name_to_import, module_symbols)
-            env = bind(getName(name_import_as, e.lineno), module_symbol, env)
+            if module_symbol:
+                env = bind(getName(name_import_as, e.lineno), module_symbol, env)
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, Import):
-        for module_name in e.names:
-            name_to_import = module_name.name
-            module, module_env = get_module_symbols(name_to_import)
-            name_import_as = module_name.asname or module_name.name
-            module_class = ClassType('module', [], module.body, module_env, e)
-            module_obj = [ObjType(module_class, [], nil, e)]
-            env = bind(getName(name_import_as, e.lineno), module_obj, env)
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, ClassDef):
@@ -1037,6 +1052,8 @@ def inferSeq(exp, env, stk):
             error('Class def %s not found in scope %s' % (e.name, env))
         for c in cs:
             c.env = env
+            c.infer_body(stk)  # infer the body only after env is changed
+            c.infer_bases()
 
         (t2, env2) = inferSeq(exp[1:], env, stk)
         return (t2, env2)
