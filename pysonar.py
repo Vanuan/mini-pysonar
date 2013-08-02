@@ -47,7 +47,7 @@ IS = isinstance
 MYDICT = defaultdict(list)
 PYTHONPATH = []
 FILES_TO_SKIP = set()
-
+imported_modules = {}
 
 
 ####################################################################
@@ -1508,8 +1508,6 @@ if __name__ == '__main__':
     # test the checker on a file
     addToPythonPath(os.path.dirname(sys.argv[1]))
     checkFile(sys.argv[1])
-
-imported_modules = {}
 
 
 def get_module_symbols(name):
