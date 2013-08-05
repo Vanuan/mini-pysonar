@@ -401,6 +401,21 @@ class Test(unittest.TestCase):
         self.assertFirstInvoked("Child", [], [("simple",)])
         self.assertFirstInvoked("A", [], [("simple",)])
 
+    @skip('class attribute')
+    def testClassAttribute(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+
+        class B():
+            string = "simple"
+
+        A().method(B.string)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+        
 
 if __name__ == "__main__":
     unittest.main()
