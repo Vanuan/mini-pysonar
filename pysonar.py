@@ -163,17 +163,7 @@ class ClassType(Type):
         self.env = env
         self.attrs = {}
         self.ast = ast_def_class
-        self.baseClasses = []
-        for base in bases:
-            if IS(base, Attribute) or base.id == 'object':
-                continue
-            baseClasses = lookup(base.id, env)
-            if (baseClasses and len(baseClasses) == 1
-                and IS(baseClasses[0], ClassType)):  # limit to one possible type
-                self.baseClasses.extend(baseClasses)
-            else:
-                logger.error('Can\'t infer base of %s: %s %s'
-                             % (name, baseClasses, base.id))
+        self.bases = bases
         if name != 'module' and name != 'dict':
             assert body  # empty body is not allowed for class
         self.body = body
@@ -185,10 +175,27 @@ class ClassType(Type):
             for pair in self.env:
                 self.attrs[pair.fst] = pair.snd
 
-    def infer_bases(self):
-        for baseClass in self.baseClasses:
-            for key, val in baseClass.attrs.iteritems():
-                self.attrs[key] = val
+    def infer_bases(self, stk):
+        debug('infer bases of %s: %s' % (self, self.bases))
+        baseClasses = []
+        for base in self.bases:
+            if IS(base, Name) and base.id == 'object':
+                continue
+            if IS(base, (Call, Attribute)):
+                inferredBaseClasses = infer(base, self.env, stk)
+            else:
+                inferredBaseClasses = lookup(base.id, self.env)
+                if not inferredBaseClasses:
+                    inferredBaseClasses = ()
+            baseClasses.extend(inferredBaseClasses)
+
+        for baseClass in baseClasses:
+            if IS(baseClass, ClassType):
+                for key, val in baseClass.attrs.iteritems():
+                    self.attrs[key] = val
+            else:
+                logger.error('Can\'t infer base of %s: %s %s'
+                             % (self.name, baseClass, base))
 
     def getattr(self, name):
         return self.attrs.get(name, ())
@@ -234,7 +241,7 @@ class ObjType(Type):
                 self.attrs[name] = (MethodType(closures, self),)
             if non_closures:
                 self.attrs[name] = non_closures
-
+        debug("object %s: %s" % (self.classtype.name, self.attrs))
         self.ctorargs = ctorargs
         self.ast = ast
 
@@ -1052,7 +1059,7 @@ def inferSeq(exp, env, stk):
             error('Class def %s not found in scope %s' % (e.name, env))
         for c in cs:
             c.env = env
-            c.infer_bases()
+            c.infer_bases(stk)
             c.infer_body(stk)  # infer the body only after env is changed
 
         (t2, env2) = inferSeq(exp[1:], env, stk)

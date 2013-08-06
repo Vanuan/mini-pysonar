@@ -416,6 +416,49 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
         
+    def testInheritanceChain(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+
+        class Base():
+            def m(self):
+                A().method("simple")
+        class Child(Base): pass
+        class ChildOfChild(Child): pass
+
+        ChildOfChild().m()
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    def testInheritanceFromCallAttributeResult(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+
+        class Base():
+            def get(self):
+                return Base
+            def m(self):
+                A().method("simple")
+        class Child(Base().get()): pass
+
+        Child().m()
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    def testInheritanceFromUnknown(self):
+        a = dedent("""
+        a = undefined
+
+        class Child(a): pass
+        """)
+        pysonar.checkString(a)
+
 
 if __name__ == "__main__":
     unittest.main()
