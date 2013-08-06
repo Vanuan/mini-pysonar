@@ -453,11 +453,35 @@ class Test(unittest.TestCase):
 
     def testInheritanceFromUnknown(self):
         a = dedent("""
-        a = undefined
+        a = []
 
         class Child(a): pass
         """)
         pysonar.checkString(a)
+
+    @skip("")
+    def testListSubscript(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a = ['simple']
+        A().method(a[0])
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    @skip("")
+    def testDictSubscript(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a = {'a': 'simple'}
+        A().method(a['a'])
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
 
 
 if __name__ == "__main__":
