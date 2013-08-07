@@ -472,6 +472,19 @@ class Test(unittest.TestCase):
         self.assertFirstInvoked("A", [], [("simple",)])
 
     @skip("")
+    def testListSubscriptAssign(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a = ['simple1']
+        a[0] = 'simple2'
+        A().method(a[0])
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple1", "simple2")])
+
+    @skip("")
     def testListAppend(self):
         a = dedent("""
         class A():
