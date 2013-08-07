@@ -459,7 +459,6 @@ class Test(unittest.TestCase):
         """)
         pysonar.checkString(a)
 
-    @skip("")
     def testListSubscript(self):
         a = dedent("""
         class A():
@@ -467,6 +466,18 @@ class Test(unittest.TestCase):
                 return arg
         a = ['simple']
         A().method(a[0])
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    def testListSubscriptSlice(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a = ['simple']
+        b = a[:]
+        A().method(b[0])
         """)
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
@@ -484,7 +495,18 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple1", "simple2")])
 
-    @skip("")
+    def testListExtend(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a = []
+        a.extend(['simple'])
+        A().method(a[0])
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
     def testListAppend(self):
         a = dedent("""
         class A():
@@ -495,6 +517,7 @@ class Test(unittest.TestCase):
         A().method(a[0])
         """)
         pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
 
     @skip("")
     def testDictSubscript(self):

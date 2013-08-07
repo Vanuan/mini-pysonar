@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.WARN)
 
 
 def _log(fn, *args):
-    #fn(' '.join(map(str, args)))
+    fn(' '.join(map(str, args)))
     pass
 
 debug = partial(_log, logger.debug)
@@ -164,7 +164,7 @@ class ClassType(Type):
         self.attrs = {}
         self.ast = ast_def_class
         self.bases = bases
-        if name != 'module' and name != 'dict':
+        if name not in ('module', 'dict', 'list'):
             assert body  # empty body is not allowed for class
         self.body = body
 
@@ -367,6 +367,10 @@ class ListType(Type):
     def __init__(self, elts):
         '@types: tuple'
         self.elts = tuple(elts)
+        self.attrs = {'append': [MethodType([self.append], self)],
+                      'extend': [MethodType([self.extend], self)]
+                     }
+        self.classtype = ClassType('list', [], [], nil, None)
 
     def __repr__(self):
         return "list:" + repr(self.elts)
@@ -383,6 +387,23 @@ class ListType(Type):
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+    def getattr(self, name):
+        return self.attrs.get(name, ())
+
+    def hasattr(self, name):
+        return name in self.attrs
+
+    def append(self, others):
+        for other in others:
+            self.elts += (other,)
+
+    def extend(self, others):
+        for other in others:
+            if IS(other, Bind):
+                self.elts += other.typ.elts
+            else:
+                print other
 
 
 def flatten(list_of_lists):
@@ -559,6 +580,12 @@ class Bind:
         return (IS(other, Bind) and
                 self.typ == other.typ and
                 self.loc == other.loc)
+
+    def getattr(self, name):
+        return self.typ.getattr(name)
+
+    def hasattr(self, name):
+        return self.typ.hasattr(name)
 
 
 class BindIterator:
@@ -752,7 +779,7 @@ def invoke1(call, clo, env, stk):
                     types.append(TypeError("Callable type %s is not supported"
                                            % closure))
             return tuple(types)
-        elif IS(attr.obj, DictType):
+        elif IS(attr.obj, (DictType, ListType)):
             types = []
             for closure in attr.clo:
                 if IS(closure, types1.MethodType):
@@ -760,7 +787,9 @@ def invoke1(call, clo, env, stk):
                     # we take the first version of infered arguments
                     # but ideally all must be processed
                     infered_args = [infer(arg, env, stk) for arg in call.args]
-                    types.extend(closure(*infered_args))
+                    method_returned = closure(*infered_args)
+                    if method_returned:
+                        types.extend(method_returned)
             return types
         else:
             err = TypeError('MethodType object is not supported for the invoke',
@@ -1155,9 +1184,6 @@ def inferSeq(exp, env, stk):
     elif IS(e, ast.Delete):
         return inferSeq(exp[1:], env, stk)
 
-    elif IS(e, ast.Subscript):
-        return inferSeq(exp[1:], env, stk)
-
     elif IS(e, ast.Exec):
         return inferSeq(exp[1:], env, stk)
 
@@ -1168,7 +1194,7 @@ def inferSeq(exp, env, stk):
 def get_attribute(exp, inferred_type, attribute_name):
     attribs = []
     for obj in inferred_type:
-        if not IS(obj, (ObjType, ClassType, DictType)):
+        if not IS(obj, (ObjType, ClassType, DictType, Bind)):
             # other types doesn't have any attributes for now
             attribs.append(TypeError('unknown object for getattr', obj))
         elif obj.hasattr(attribute_name):
@@ -1268,7 +1294,7 @@ def infer(exp, env, stk):
         eltTypes = []
         for e in exp.elts:
             t = infer(e, env, stk)
-            eltTypes.append(tuple(t))
+            eltTypes.extend(tuple(t))
         return [Bind(ListType(eltTypes), exp)]
 
     # elif IS(exp, Tuple):
@@ -1302,8 +1328,22 @@ def infer(exp, env, stk):
             dic = ext(key, value, dic)
         return [DictType(dic)]
 
-    if IS(exp, ast.BinOp):
+    elif IS(exp, ast.Subscript):
+        types = []
+        t = infer(exp.value, env, stk)
+        for tt in t:
+            if IS(tt, Bind):
+                if IS(exp.slice, ast.Index):
+                    types.extend(tt.typ.elts)
+                else:
+                    types.extend(t)
+            else:
+                types.append(UnknownType(exp))
+        return types
+
+    elif IS(exp, ast.BinOp):
         return inferBinOp(exp, env, stk)
+
     else:
         return [UnknownType(exp)]
 

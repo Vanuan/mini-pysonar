@@ -95,7 +95,7 @@ class TestAttributeInference(unittest.TestCase):
     def testReprUnicode(self):
         tree = pysonar.createAST("[u'\\xae']").body[0].value
         t = pysonar.infer(tree, nil, nil)
-        self.assertEqual("[(list:((u'\\xae'@<string>:1,),) <~~ <class '_ast.List'>@<string>:1)]", repr(t))
+        self.assertEqual("[(list:(u'\\xae'@<string>:1,) <~~ <class '_ast.List'>@<string>:1)]", repr(t))
 
 
 if __name__ == "__main__":
