@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.WARN)
 
 
 def _log(fn, *args):
-    fn(' '.join(map(str, args)))
+    #fn(' '.join(map(str, args)))
     pass
 
 debug = partial(_log, logger.debug)
@@ -403,7 +403,7 @@ class ListType(Type):
             if IS(other, Bind):
                 self.elts += other.typ.elts
             else:
-                print other
+                error("Extend called with unknown argument type", other)
 
 
 def flatten(list_of_lists):
@@ -629,7 +629,7 @@ def mergeEnv(env1, env2):
         p2 = assq(first(p1), env2)
         if p2 != None:
             ret = ext(first(p1), union([rest(p1), rest(p2)]), ret)
-    return ret
+    return reverse(ret)
 
 
 # compare both str's and Name's for equivalence, because

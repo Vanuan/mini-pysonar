@@ -30,8 +30,20 @@ class Test(unittest.TestCase):
         def strEquals(self, other):
             if isinstance(other, str):
                 return self.s == other
+            if isinstance(other, ast.Str):
+                return self.s == other.s
+            return NotImplemented
+        def strHash(self):
+            return hash(self.s)
+        ast.Str.__hash__ = strHash
+        def strLt(self, other):
+            if isinstance(other, str):
+                return self.s < other
+            if isinstance(other, ast.Str):
+                return self.s < other.s
             return NotImplemented
         ast.Str.__eq__ = strEquals
+        ast.Str.__lt__ = strLt
 
         pysonar.addToPythonPath("tests/")
 
@@ -40,8 +52,8 @@ class Test(unittest.TestCase):
         self.assertTrue(len(class_method_invocations) > 0, 'no method invocations of %s' % class_name)
         actual_init_args, actual_method_args, _, _ = class_method_invocations[0]
         
-        self.assertEqual(init_args, actual_init_args)
-        self.assertEqual(method_args, actual_method_args)
+        self.assertItemsEqual(init_args, actual_init_args)
+        self.assertItemsEqual(method_args, actual_method_args)
 
     def testSimpleConstant(self):
         a = dedent("""
@@ -196,21 +208,36 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
-    @skip("Bug")
-    def testMultipleAssignments(self):
+    def testMultipleAssignmentsInIf(self):
         a = dedent("""
         class A():
             def method(self, arg):
                 return arg
-        a = None
+        a = 'a'
         if True:
-            a = 'a'
-        else:
             a = 'b'
+        else:
+            a = 'c'
         A().method(a)
         """)
         pysonar.checkString(a)
-        self.assertFirstInvoked("A", [], [(pysonar.PrimType(None), "a", "b")])
+        self.assertFirstInvoked("A", [], [("c", "b")])
+
+    @skip("")
+    def testMultipleAssignmentsTryExcept(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a = 'a'
+        try:
+            a = 'b'
+        except:
+            a = 'c'
+        A().method(a)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("b", "c")])
 
     def testChainedAttribute(self):
         a = dedent("""
