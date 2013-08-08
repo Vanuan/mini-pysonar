@@ -349,6 +349,7 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
+    @skip("")
     def testStrFormattingUnsupported(self):
         a = dedent("""
         class A():
@@ -554,6 +555,18 @@ class Test(unittest.TestCase):
                 return arg
         a = {'a': 'simple'}
         A().method(a['a'])
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    def testForInTuple(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a = ('simple',)
+        for b in a:
+            A().method(b)
         """)
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])

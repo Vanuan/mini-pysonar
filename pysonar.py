@@ -1290,7 +1290,7 @@ def infer(exp, env, stk):
         return tuple(infer_attribute(exp, env, stk))
 
     ## ignore complex types for now
-    elif IS(exp, List):
+    elif IS(exp, (List, Tuple)):
         eltTypes = []
         for e in exp.elts:
             t = infer(e, env, stk)
