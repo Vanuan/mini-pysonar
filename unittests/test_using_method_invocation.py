@@ -629,6 +629,18 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
+    def testStarArgs(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        def f(*args):
+            A().method(args[0])
+        f('simple')
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
 
 if __name__ == "__main__":
     unittest.main()

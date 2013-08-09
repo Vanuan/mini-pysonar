@@ -862,6 +862,7 @@ def invokeClosure(call, actualParams, clo, env, stk):
             for i in xrange(len(func.args.args), len(actualParams)):
                 t = infer(actualParams[i], env, stk)
                 ts = tuple(ts) + tuple(t)
+            ts = [Bind(ListType(ts), func.args.vararg)]
             pos = bind(func.args.vararg, ts, pos)
 
     # bind keywords, collect kwarg
