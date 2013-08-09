@@ -721,7 +721,8 @@ def getMethodInvocationInfo():
 
 
 def is_callable(clo):
-    return IS(clo, (Closure, ClassType, MethodType, types1.MethodType))
+    return (IS(clo, (Closure, ClassType, MethodType, types1.MethodType))) or\
+           (IS(clo, ObjType) and clo.hasattr('__call__'))
 
 
 # invoke one closure
@@ -734,9 +735,8 @@ def invoke1(call, clo, env, stk):
     # arguments for partial information.
     if not is_callable(clo):
         # infer arguments even if it is not callable
-        # (we don't know which method it is)
         # probably causes infinite recursion
-        debug('Unknown function or method, infering arguments', call.args)
+        debug('Object is not callable, infering arguments', call.args)
         for a in call.args:
             infer(a, env, stk)
         for k in call.keywords:
@@ -802,6 +802,12 @@ def invoke1(call, clo, env, stk):
                             attr)
             putInfo(call, err)
             return (err,)
+    elif IS(clo, ObjType):
+        types = []
+        call_closures = clo.getattr('__call__')
+        for call_closure in call_closures:
+            types.extend(invoke1(call, call_closure, env, stk))
+        return tuple(types)
     else:  # Closure
         if clo.func.filename not in FILES_TO_SKIP:
             return invokeClosure(call, call.args, clo, env, stk)
