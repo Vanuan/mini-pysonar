@@ -9,8 +9,9 @@ from ast import parse, ClassDef, FunctionDef, Attribute, Name, List, Tuple,\
     Continue, TryExcept, TryFinally, ExceptHandler, Raise, Assert, Module,\
     Num, Str, Call, Lambda, Break, Global, With, Print, Pass, AST, BinOp,\
     Compare, Mult, Add
-from lists import lookup, nil, ext, first, rest, assq, reverse, maplist,\
+from lists import nil, ext, first, rest, assq, reverse, maplist,\
     SimplePair, append
+import lists
 
 from collections import defaultdict
 import os
@@ -48,6 +49,7 @@ MYDICT = defaultdict(list)
 PYTHONPATH = []
 FILES_TO_SKIP = set()
 imported_modules = {}
+module_objects = {}
 
 
 ####################################################################
@@ -718,15 +720,19 @@ def getMethodInvocationInfo():
     return MYDICT
 
 
+def is_callable(clo):
+    return IS(clo, (Closure, ClassType, MethodType, types1.MethodType))
+
+
 # invoke one closure
 def invoke1(call, clo, env, stk):
     '''@types: ast.Call, Callable, LinkedList, LinkedList -> ast.AST or Type
     '''
     if (clo == bottomType):
         return [bottomType]
-    # Even if operator is not a closure, resolve the
+    # Even if operator is not a callable, resolve the
     # arguments for partial information.
-    if not IS(clo, (Closure, ClassType, MethodType, types1.MethodType)):
+    if not is_callable(clo):
         # infer arguments even if it is not callable
         # (we don't know which method it is)
         # probably causes infinite recursion
@@ -929,15 +935,24 @@ def close(code_block, env):
         if IS(e, (Import)):
             for module_name in e.names:
                 name_to_import = module_name.name
-                module, module_env = get_module_symbols(name_to_import)
+                module_obj = getModuleObject(name_to_import)
                 name_import_as = module_name.asname or module_name.name
-                module_class = ClassType('module', [], module.body, module_env, e)
-                module_class.infer_body(nil)
-                module_obj = [ObjType(module_class, [], nil, e)]
-                env = bind(getName(name_import_as, e.lineno), module_obj, env)
+                env = bind(getName(name_import_as, e.lineno), [module_obj], env)
         # TODO: here we also need ImportFrom and Assign
         # Assign is complicated
     return env
+
+
+def getModuleObject(name_to_import):
+    if name_to_import not in module_objects:
+        module, module_env = get_module_symbols(name_to_import)
+        module_class = ClassType('module', [], module.body, module_env, None)
+        module_class.infer_body(nil)
+        module_obj = ObjType(module_class, [], nil, None)
+        module_objects[name_to_import] = module_obj
+    else:
+        module_obj = module_objects[name_to_import]
+    return module_obj
 
 
 def isTerminating(t):
@@ -1392,6 +1407,7 @@ def nodekey(node):
 # check a single (parsed) expression
 def checkExp(exp):
     clear()
+    addToPythonPath(os.path.dirname(sys.modules[__name__].__file__))
     ret = infer(exp, nil, nil)
     if history.keys() != [] and logger.isEnabledFor(logging.DEBUG):
         debug("---------------------------- history -------------------------")
@@ -1427,16 +1443,13 @@ def createAST(string, filename='<string>'):
 
 def getModuleExp(modulename):
     modulename = modulename.replace('.', os.path.sep)
-    if PYTHONPATH:
-        directory_name = PYTHONPATH[0]
-    else:
-        directory_name = '.'
-    try:
-        filename = os.path.join(directory_name, modulename + '.py')
-        return parseFile(filename)
-    except IOError, e:
-        warn(str(e))
-        return createAST('')
+    for directory_name in PYTHONPATH:
+        try:
+            filename = os.path.join(directory_name, modulename + '.py')
+            return parseFile(filename)
+        except IOError, e:
+            warn(str(e))
+    return createAST('')
 
 
 ###################################################################
@@ -1566,3 +1579,12 @@ def get_module_symbols(name):
         _, module_symbols = inferSeq(module.body, env1, nil)
         imported_modules[name] = (module, module_symbols)
     return module, module_symbols
+
+def lookup(identifier, env):
+    obj = lists.lookup(identifier, env)
+    if not obj:  # might be a built-in
+        builtins = getModuleObject('__builtins__')
+        obj = builtins.getattr(identifier)
+        if not obj:
+            obj = None
+    return obj
