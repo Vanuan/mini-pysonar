@@ -583,6 +583,23 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
+    def testMap(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        def fun1(i):
+            return 'simple'
+        def fun2(i):
+            return i
+        a = map(fun1, ('',))
+        a = map(fun2, a)
+        b = a[0]
+        A().method(b)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
     def testObjectCall(self):
         a = dedent("""
         class A():
