@@ -600,6 +600,22 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
+    @skip("")
+    def testReduce(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        l = []
+        def append(a, b):
+            l.append(a)
+            return b
+        reduce(append, ['a', 'b', 'c'])
+        A().method(l[0])
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [('a','b')])
+
     def testObjectCall(self):
         a = dedent("""
         class A():
