@@ -952,9 +952,7 @@ def close(code_block, env):
             # env is needed to infer bases
             # (maybe it's better to move base inference out of constructor)
             c = ClassType(e.name, e.bases, e.body, env, e)
-        if IS(e, (FunctionDef, ClassDef)):
-            env = ext(e.name, [c], env)
-        if IS(e, (Import)):
+        elif IS(e, (Import)):
             for module_name in e.names:
                 name_to_import = module_name.name
                 module_obj = getModuleObject(name_to_import)
@@ -962,6 +960,13 @@ def close(code_block, env):
                 env = bind(getName(name_import_as, e.lineno), [module_obj], env)
         # TODO: here we also need ImportFrom and Assign
         # Assign is complicated
+        elif IS(e, Assign):
+            for x in e.targets:
+                # here we prepare a local scope for class args inference
+                # (see __saveClassAttrs method)
+                env = bind(x, (), env)
+        if IS(e, (FunctionDef, ClassDef)):
+            env = ext(e.name, [c], env)
     return env
 
 

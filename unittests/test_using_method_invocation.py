@@ -429,7 +429,6 @@ class Test(unittest.TestCase):
         self.assertFirstInvoked("Child", [], [("simple",)])
         self.assertFirstInvoked("A", [], [("simple",)])
 
-    @skip('class attribute')
     def testClassAttribute(self):
         a = dedent("""
         class A():
