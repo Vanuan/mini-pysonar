@@ -865,6 +865,21 @@ def invokeClosure(call, actualParams, clo, env, stk):
             ts = [Bind(ListType(ts), func.args.vararg)]
             pos = bind(func.args.vararg, ts, pos)
 
+    # put starargs to vararg or args
+    if call.starargs:
+        tt = infer(call.starargs, env, stk)
+
+        ts = []
+        for t in tt:
+            if IS(t, Bind):
+                ts.append(t)
+        if func.args.vararg:
+            pos = bind(func.args.vararg, ts, pos)
+        else:
+            for t in ts:
+                for i in range(len(func.args.args)):
+                    pos = bind(func.args.args[i], t.typ.elts, pos)
+
     # bind keywords, collect kwarg
     ids = map(getId, func.args.args)
     for k in call.keywords:
