@@ -573,6 +573,43 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
+    def testDictSubscriptAssign(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a = {}
+        a['a'] = 'simpleA'
+        A().method(a['a'])
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simpleA",)])
+
+    def testDictSubscriptReAssign(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a = {'a': 'simpleA'}
+        a['a'] = 'simpleB'
+        A().method(a['a'])
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simpleA", "simpleB")])
+
+    def testDictSubscriptAssignValues(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a = {'a': 'simpleA'}
+        a['a'] = 'simpleB'
+        for b in a.values():
+            A().method(b)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simpleA", "simpleB")])
+
     def testForInTuple(self):
         a = dedent("""
         class A():

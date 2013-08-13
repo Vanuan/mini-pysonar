@@ -456,6 +456,10 @@ class DictType(Type):
             value.extend(default)
         return tuple(value)
 
+    def set_key(self, key, value):
+        self.dict = mergeEnv(ext(key, value, nil), self.dict, True)
+        debug('updating dict with', value, self)
+
     #@staticmethod
     def get_keys(self):
         '@types: LinkedList -> list'
@@ -623,14 +627,17 @@ def removeType(t, u):
 
 
 # combine two environments, make unions when necessary
-# only assocs appear in both envs are preserved
+# if append=False, only assocs appear in both envs are preserved
 # use a variable bound in only one branch will cause type error
-def mergeEnv(env1, env2):
+def mergeEnv(env1, env2, append=False):
     ret = nil
     for p1 in env1:
         p2 = assq(first(p1), env2)
         if p2 != None:
             ret = ext(first(p1), union([rest(p1), rest(p2)]), ret)
+        else:
+            if append:
+                ret = ext(first(p1), union([rest(p1)]), ret)
     return reverse(ret)
 
 
@@ -647,7 +654,7 @@ def getName(x, lineno):
     return Name(id=x, lineno=lineno)
 
 
-def bind(target, infered_value, env):
+def bind(target, infered_value, env, stk):
     if IS(target, Name) or IS(target, str):
         u = infered_value
         putInfo(target, u)
@@ -680,12 +687,23 @@ def bind(target, infered_value, env):
                 putInfo(target, TypeError('non-iterable object'))
         for key, value in target_to_value.iteritems():
             debug('binding %s to %s:' % (key, value))
-            env = bind(key, value, env)
+            env = bind(key, value, env, stk)
         return env
 
     elif IS(target, ast.Subscript):
-        error("Syntax error: Subscript type is not supported in assignment: ",
-              target)
+        t = infer(target.value, env, nil)
+        for tt in t:
+            #if IS(tt, Bind):
+            #    if IS(exp.slice, ast.Index):
+            #        types.extend(tt.typ.elts)
+            #    else:
+            #        types.extend(t)
+            if IS(tt, DictType) and IS(target.slice, ast.Index):
+                subscripts = infer(target.slice.value, env, stk)
+                for subscript in subscripts:
+                    tt.set_key(subscript, infered_value)
+            else:
+                error("Syntax error: Subscript type is not supported in assignment: ", target)
         return env
     else:
         putInfo(target, SyntaxError("not assignable"))
@@ -848,7 +866,7 @@ def invokeClosure(call, actualParams, clo, env, stk):
     poslen = min(len(func.args.args), len(actualParams))
     for i in xrange(poslen):
         t = infer(actualParams[i], env, stk)
-        pos = bind(func.args.args[i], t, pos)
+        pos = bind(func.args.args[i], t, pos, stk)
 
     # put extra positionals into vararg if provided
     # report error and go on otherwise
@@ -863,7 +881,7 @@ def invokeClosure(call, actualParams, clo, env, stk):
                 t = infer(actualParams[i], env, stk)
                 ts = tuple(ts) + tuple(t)
             ts = [Bind(ListType(ts), func.args.vararg)]
-            pos = bind(func.args.vararg, ts, pos)
+            pos = bind(func.args.vararg, ts, pos, stk)
 
     # put starargs to vararg or args
     if call.starargs:
@@ -874,11 +892,11 @@ def invokeClosure(call, actualParams, clo, env, stk):
             if IS(t, Bind):
                 ts.append(t)
         if func.args.vararg:
-            pos = bind(func.args.vararg, ts, pos)
+            pos = bind(func.args.vararg, ts, pos, stk)
         else:
             for t in ts:
                 for i in range(len(func.args.args)):
-                    pos = bind(func.args.args[i], t.typ.elts, pos)
+                    pos = bind(func.args.args[i], t.typ.elts, pos, stk)
 
     # bind keywords, collect kwarg
     ids = map(getId, func.args.args)
@@ -889,19 +907,19 @@ def invokeClosure(call, actualParams, clo, env, stk):
             putInfo(call, TypeError('multiple values for keyword argument',
                                      k.arg, tloc1))
         elif k.arg not in ids:
-            kwarg = bind(k.arg, ts, kwarg)
+            kwarg = bind(k.arg, ts, kwarg, stk)
         else:
-            pos = bind(k.arg, ts, pos)
+            pos = bind(k.arg, ts, pos, stk)
 
     # put extras in kwarg or report them
     # bind call.keywords to func.args.kwarg
     if kwarg != nil:
         if func.args.kwarg != None:
-            pos = bind(func.args.kwarg, [DictType(reverse(kwarg))], pos)
+            pos = bind(func.args.kwarg, [DictType(reverse(kwarg))], pos, stk)
         else:
             putInfo(call, TypeError("unexpected keyword arguements", kwarg))
     elif func.args.kwarg != None:
-        pos = bind(func.args.kwarg, [DictType(nil)], pos)
+        pos = bind(func.args.kwarg, [DictType(nil)], pos, stk)
 
     # bind defaults, avoid overwriting bound vars
     # types for defaults are already inferred when the function was defined
@@ -910,7 +928,7 @@ def invokeClosure(call, actualParams, clo, env, stk):
     for j in xrange(len(clo.defaults)):
         tloc = lookup(getId(func.args.args[i]), pos)
         if tloc == None:
-            pos = bind(func.args.args[i], clo.defaults[j], pos)
+            pos = bind(func.args.args[i], clo.defaults[j], pos, stk)
             i += 1
 
     # finish building the input type
@@ -957,14 +975,14 @@ def close(code_block, env):
                 name_to_import = module_name.name
                 module_obj = getModuleObject(name_to_import)
                 name_import_as = module_name.asname or module_name.name
-                env = bind(getName(name_import_as, e.lineno), [module_obj], env)
+                env = bind(getName(name_import_as, e.lineno), [module_obj], env, nil)
         # TODO: here we also need ImportFrom and Assign
         # Assign is complicated
         elif IS(e, Assign):
             for x in e.targets:
                 # here we prepare a local scope for class args inference
                 # (see __saveClassAttrs method)
-                env = bind(x, (), env)
+                env = bind(x, (), env, nil)
         if IS(e, (FunctionDef, ClassDef)):
             env = ext(e.name, [c], env)
     return env
@@ -1051,7 +1069,7 @@ def inferSeq(exp, env, stk):
     elif IS(e, For):
         values = infer(e.iter, env, stk)
         value = flatten(values)
-        env = bind(e.target, value, env)
+        env = bind(e.target, value, env, stk)
         (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
         (t2, env2) = inferSeq(e.orelse, close(e.orelse, env), stk)
 
@@ -1078,12 +1096,12 @@ def inferSeq(exp, env, stk):
     elif IS(e, Assign):
         t = infer(e.value, env, stk)
         for x in e.targets:
-            env = bind(x, t, env)
+            env = bind(x, t, env, stk)
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, AugAssign):
         t = infer(e.value, env, stk)
-        env = bind(e.target, t, env)
+        env = bind(e.target, t, env, stk)
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, FunctionDef):
@@ -1118,7 +1136,7 @@ def inferSeq(exp, env, stk):
             name_import_as = module_name.asname or name_to_import
             module_symbol = lookup(name_to_import, module_symbols)
             if module_symbol:
-                env = bind(getName(name_import_as, e.lineno), module_symbol, env)
+                env = bind(getName(name_import_as, e.lineno), module_symbol, env, stk)
         return inferSeq(exp[1:], env, stk)
 
     elif IS(e, Import):
