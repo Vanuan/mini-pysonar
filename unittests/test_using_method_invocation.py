@@ -443,6 +443,22 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
         
+    def testClassAttributeInDefaults(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+
+        class B():
+            string = "simple"
+            def m(self, a=string):
+                return a
+
+        A().method(B.m())
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
     def testInheritanceChain(self):
         a = dedent("""
         class A():
@@ -546,7 +562,6 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
-    @skip("")
     def testDictSubscript(self):
         a = dedent("""
         class A():

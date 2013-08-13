@@ -1379,8 +1379,11 @@ def infer(exp, env, stk):
                     types.extend(tt.typ.elts)
                 else:
                     types.extend(t)
+            elif IS(tt, DictType):
+                subscript = infer(exp.slice, env, stk)
+                types.extend(tt.get_key(subscript))
             else:
-                types.append(UnknownType(exp))
+                types.append(TypeError('%s of %s' % (UnknownType(exp), tt.__class__)))
         return types
 
     elif IS(exp, ast.BinOp):
