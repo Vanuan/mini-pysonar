@@ -691,7 +691,7 @@ def bind(target, infered_value, env, stk):
         return env
 
     elif IS(target, ast.Subscript):
-        t = infer(target.value, env, nil)
+        t = infer(target.value, env, stk)
         for tt in t:
             #if IS(tt, Bind):
             #    if IS(exp.slice, ast.Index):
@@ -1401,7 +1401,7 @@ def infer(exp, env, stk):
                 subscript = infer(exp.slice, env, stk)
                 types.extend(tt.get_key(subscript))
             else:
-                types.append(TypeError('%s of %s' % (UnknownType(exp), tt.__class__)))
+                types.append('PysonarError: %s of %s' % (UnknownType(exp), tt.__class__))
         return types
 
     elif IS(exp, ast.BinOp):

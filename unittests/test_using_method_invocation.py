@@ -573,6 +573,18 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
+    def testRecurseInfiniteSubscript(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        def recurse(a):
+            b = a[1]
+            recurse(b)
+        recurse([])
+        """)
+        pysonar.checkString(a)
+
     def testDictSubscriptAssign(self):
         a = dedent("""
         class A():
