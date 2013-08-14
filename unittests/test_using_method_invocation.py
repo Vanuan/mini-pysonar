@@ -597,6 +597,18 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simpleA",)])
 
+    def testDictUpdate(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a = {}
+        a.update({'a': 'simpleA'})
+        A().method(a['a'])
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simpleA",)])
+
     def testDictSubscriptReAssign(self):
         a = dedent("""
         class A():

@@ -433,6 +433,7 @@ class DictType(Type):
                       'itervalues': [MethodType([self.get_values], self)],
                       'items': [MethodType([self.get_items], self)],
                       'iteritems': [MethodType([self.get_items], self)],
+                      'update': [MethodType([self.update], self)],
                       'get': [MethodType([self.get_key], self)]}
         self.classtype = ClassType('dict', [], [], nil, None)
         self.iter_operations = (self.get_keys, self.get_values, self.get_items)
@@ -459,6 +460,13 @@ class DictType(Type):
     def set_key(self, key, value):
         self.dict = mergeEnv(ext(key, value, nil), self.dict, True)
         debug('updating dict with', value, self)
+
+    def update(self, new_dicts):
+        for new_dict in new_dicts:
+            if IS(new_dict, DictType):
+                self.dict = mergeEnv(new_dict.dict, self.dict, True)
+            else:
+                error('wrong dict update attribute', new_dict)
 
     #@staticmethod
     def get_keys(self):
