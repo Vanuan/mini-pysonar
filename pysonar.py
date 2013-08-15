@@ -458,8 +458,8 @@ class DictType(Type):
         return tuple(value)
 
     def set_key(self, key, value):
-        self.dict = mergeEnv(ext(key, value, nil), self.dict, True)
         debug('updating dict with', value, self)
+        self.dict = mergeEnv(ext(key, value, nil), self.dict, True)
 
     def update(self, new_dicts):
         for new_dict in new_dicts:
@@ -639,14 +639,34 @@ def removeType(t, u):
 # use a variable bound in only one branch will cause type error
 def mergeEnv(env1, env2, append=False):
     ret = nil
-    for p1 in env1:
-        p2 = assq(first(p1), env2)
-        if p2 != None:
-            ret = ext(first(p1), union([rest(p1), rest(p2)]), ret)
+    if not append:
+        for p1 in env1:
+            p2 = assq(first(p1), env2)
+            if p2 != None:
+                ret = ext(first(p1), union([rest(p1), rest(p2)]), ret)
+        return reverse(ret)
+    else:
+         return mergeDict(env1, env2)
+
+
+# appends and merges values
+# and return the merged env
+def mergeDict(env1, env2):
+    items = []
+    map(items.append, env1)
+    map(items.append, env2)
+    dictEnv = {}
+    for item in items:
+        key, value = first(item), rest(item)
+        if key in dictEnv:
+            united = union([value, dictEnv[key]])
         else:
-            if append:
-                ret = ext(first(p1), union([rest(p1)]), ret)
-    return reverse(ret)
+            united = value
+        dictEnv[key] = united
+    res = nil
+    for key, value in dictEnv.iteritems():
+        res = ext(key, value, res)
+    return res
 
 
 # compare both str's and Name's for equivalence, because

@@ -590,13 +590,13 @@ class Test(unittest.TestCase):
         class A():
             def method(self, arg):
                 return arg
-        a = {}
-        a['a'] = 'simpleA'
-        a['b'] = 'simpleB'
+        a = {'a': 'simpleA', 'b': 'simpleB'}
+        a['a'] = 'simpleA2'
+        a['b'] = 'simpleB2'
         A().method(a[unknown])
         """)
         pysonar.checkString(a)
-        self.assertFirstInvoked("A", [], [("simpleA","simpleB")])
+        self.assertFirstInvoked("A", [], [("simpleB2","simpleB", "simpleA2","simpleA")])
 
     def testDictUpdate(self):
         a = dedent("""
