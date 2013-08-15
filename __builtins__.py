@@ -3,3 +3,6 @@ def filter(function, iterable):
 
 def map(function, iterable):
     return [function(iterable[0])]  # simplified
+
+def reduce(func, b, init=[]):
+    return func(b[0])

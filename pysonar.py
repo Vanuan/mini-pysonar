@@ -1456,6 +1456,17 @@ def inferBinOp(exp, env, stk):
                         pass
             else:
                 results.append(exp)
+    elif IS(exp.op, ast.Add):
+        lefts = infer(exp.left, env, stk)
+        rights = infer(exp.right, env, stk)
+        list_elts = []
+        for left in lefts:
+            if IS(left, Bind):
+                for right in rights:
+                    if IS(right, Bind):
+                        list_elts.extend(left.typ.elts + right.typ.elts)
+        new_list = ListType(list_elts)
+        results.append(Bind(new_list, exp))
     else:
         results.append(exp)
     return tuple(results)

@@ -676,7 +676,6 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
-    @skip("")
     def testReduce(self):
         a = dedent("""
         class A():
@@ -690,7 +689,19 @@ class Test(unittest.TestCase):
         A().method(l[0])
         """)
         pysonar.checkString(a)
-        self.assertFirstInvoked("A", [], [('a','b')])
+        self.assertFirstInvoked("A", [], [('a','b','c')])
+
+    def testListSum(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        l = ['a'] + ['b'] + ['c']
+        A().method(l[0])
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [('a','b','c')])
+
 
     def testObjectCall(self):
         a = dedent("""
