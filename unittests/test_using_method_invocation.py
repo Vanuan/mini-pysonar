@@ -773,6 +773,18 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
+    def testCopyCopy(self):
+        a = dedent("""
+        import copy
+        class A():
+            def method(self, arg):
+                return arg
+        a = copy.copy("simple")
+        A().method(a)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
 
 if __name__ == "__main__":
     unittest.main()
