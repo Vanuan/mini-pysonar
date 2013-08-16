@@ -1494,7 +1494,8 @@ def nodekey(node):
 # check a single (parsed) expression
 def checkExp(exp):
     clear()
-    addToPythonPath(os.path.dirname(sys.modules[__name__].__file__))
+    pysonarLib = os.path.dirname(sys.modules[__name__].__file__) + '/LibPysonar'
+    addToPythonPath(pysonarLib)
     ret = infer(exp, nil, nil)
     if history.keys() != [] and logger.isEnabledFor(logging.DEBUG):
         debug("---------------------------- history -------------------------")

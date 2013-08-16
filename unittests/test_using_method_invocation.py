@@ -373,7 +373,6 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
-
     def testCallMethodOfClass(self):
         a = dedent("""
         class A():
@@ -407,6 +406,24 @@ class Test(unittest.TestCase):
         """)
         pysonar.checkString(a)
         self.assertFirstInvoked("Child", [], [("simple",)])
+        self.assertFirstInvoked("A", [], [("simple",)])
+
+    def testSelf(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+
+        class B():
+            def a(self, arg):
+                self.b(arg)
+
+            def b(self, arg):
+                A().method(arg)
+
+        B().a('simple')
+        """)
+        pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("simple",)])
 
     def testOverrideParentMethod(self):
