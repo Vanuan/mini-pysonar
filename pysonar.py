@@ -1284,7 +1284,10 @@ def get_attribute(exp, inferred_type, attribute_name):
     for obj in inferred_type:
         if not IS(obj, (ObjType, ClassType, DictType, Bind)):
             # other types doesn't have any attributes for now
-            attribs.append(TypeError('unknown object for getattr', obj))
+            if not IS(obj, TypeError):
+                attribs.append(TypeError('unknown object for getattr', obj))
+            else:
+                attribs.append(obj)
         elif obj.hasattr(attribute_name):
             # get the attribute itself
             attribs.extend(obj.getattr(attribute_name))

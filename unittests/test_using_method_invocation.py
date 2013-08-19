@@ -602,6 +602,17 @@ class Test(unittest.TestCase):
         """)
         pysonar.checkString(a)
 
+    def testRecurseInfiniteUnknownAttr(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        def recurse(a):
+            recurse(a.a)
+        recurse(a)
+        """)
+        pysonar.checkString(a)
+
     def testDictSubscriptAssign(self):
         a = dedent("""
         class A():
