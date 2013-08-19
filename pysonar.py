@@ -205,13 +205,21 @@ class ClassType(Type):
         return name in self.attrs
 
     def __saveClassAttrs(self, body, stk):
-        # infer body
+        # the env created when infering class body should be without globals,
+        # but with globals, when interpreting it,
+        # i.e. we want to divide globals and locals, but we do this
+        # in a hacky way.
+        # TODO: refactor to return globals and locals separately
         local_env = close(body, nil)  # {Name.id -> (Closure | ClassType)}
         mixed_env = close(body, self.env)
         _, mixed_env = inferSeq(body, mixed_env, stk)  # Closure's env will be updated,
         for pair in local_env:
-            # Closure's env will be updated, when invoking MethodType
-            self.attrs[pair.fst] = lookup(pair.fst, mixed_env)
+            # here we want closures to receive only the globals
+            class_attrs = lookup(pair.fst, mixed_env)
+            for class_attr in class_attrs:
+                if IS(class_attr, Closure):
+                    class_attr.env = self.env
+            self.attrs[pair.fst] = class_attrs
 
     def __repr__(self):
         return "ClassType:" + str(self.ast)

@@ -730,6 +730,21 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [('a','b','c')])
 
+    def testClassScope(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        a = 'simple'
+        class B():
+            a = 'hard'
+
+            def method(self):
+                A().method(a)
+        B().method()
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
 
     def testObjectCall(self):
         a = dedent("""
