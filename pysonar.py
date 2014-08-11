@@ -766,6 +766,7 @@ def saveMethodInvocationInfo(call, method, env, stk):
         # but there seems to be no other simple way
         # to save both class name and infered arguments
         callargs = [resolve_attribute(infer(arg, env, stk)) for arg in call.args]
+        env = nil  # storing env is expensive
         # TODO save keywords
         MYDICT[method.obj.classtype.name].append((ctorargs, callargs, env, method_names))
 
@@ -1198,7 +1199,7 @@ def inferSeq(exp, env, stk):
 
     elif IS(e, TryExcept):
         (t1, env1) = inferSeq(e.body, close(e.body, env), stk)
-        (t2, env2) = inferSeq(e.orelse, close(e.orelse, env), stk)
+        (t2, env2) = inferSeq(e.orelse, close(e.orelse, env1), stk)
         (_, _) = inferSeq(e.handlers, close(e.handlers, env), stk)
 
         if isTerminating(t1) and isTerminating(t2):           # both terminates
@@ -1216,7 +1217,7 @@ def inferSeq(exp, env, stk):
             t1 = finalize(t1)
             return (union([t1, t2, t3]), env3)
         else:                                           # both non-terminating
-            (t3, env3) = inferSeq(exp[1:], mergeEnv(env1, env2), stk)
+            (t3, env3) = inferSeq(exp[1:], env2, stk)
             t1 = finalize(t1)
             t2 = finalize(t2)
             return (union([t1, t2, t3]), env3)
@@ -1649,6 +1650,27 @@ def printAst(node):
         return ret
 
 
+def get_module_symbols(name):
+    if name in imported_modules:
+        return imported_modules.get(name)
+    else:
+        module = getModuleExp(name)
+        env1 = close(module.body, nil)  # TODO refactor along with infer(list)
+        _, module_symbols = inferSeq(module.body, env1, nil)
+        imported_modules[name] = (module, module_symbols)
+    return module, module_symbols
+
+
+def lookup(identifier, env):
+    obj = lists.lookup(identifier, env)
+    if not obj:  # might be a built-in
+        builtins = getModuleObject('__builtins__')
+        obj = builtins.getattr(identifier)
+        if not obj:
+            obj = None
+    return obj
+
+
 def addToPythonPath(dirname):
     PYTHONPATH.append(dirname)
 
@@ -1669,21 +1691,3 @@ if __name__ == '__main__':
     checkFile(sys.argv[1])
 
 
-def get_module_symbols(name):
-    if name in imported_modules:
-        return imported_modules.get(name)
-    else:
-        module = getModuleExp(name)
-        env1 = close(module.body, nil)  # TODO refactor along with infer(list)
-        _, module_symbols = inferSeq(module.body, env1, nil)
-        imported_modules[name] = (module, module_symbols)
-    return module, module_symbols
-
-def lookup(identifier, env):
-    obj = lists.lookup(identifier, env)
-    if not obj:  # might be a built-in
-        builtins = getModuleObject('__builtins__')
-        obj = builtins.getattr(identifier)
-        if not obj:
-            obj = None
-    return obj

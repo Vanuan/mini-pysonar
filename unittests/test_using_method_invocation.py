@@ -223,6 +223,21 @@ class Test(unittest.TestCase):
         pysonar.checkString(a)
         self.assertFirstInvoked("A", [], [("c", "b")])
 
+    def testTryExceptElse(self):
+        a = dedent("""
+        class A():
+            def method(self, arg):
+                return arg
+        try:
+            a = 'simple'
+        except:
+            pass
+        else:
+            A().method(a)
+        """)
+        pysonar.checkString(a)
+        self.assertFirstInvoked("A", [], [("simple",)])
+
     @skip("")
     def testMultipleAssignmentsTryExcept(self):
         a = dedent("""

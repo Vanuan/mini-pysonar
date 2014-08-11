@@ -22,6 +22,20 @@ if __name__ == '__main__':
 
     #cProfile.run('pysonar.checkFile("' + sys.argv[1] + '")')
     pysonar.checkFile(sys.argv[1])
+
+    if len(sys.argv) > 2 and sys.argv[2] == '--history':
+      print '============================='
+      for k, v in pysonar.history.iteritems():
+          if hasattr(k, 'lineno') and hasattr(k, 'filename'):
+              name = ''
+              if hasattr(k, 'id'):
+                  name = k.id
+              if hasattr(k, 'name'):
+                  name = k.name
+              print '{"filename":"%s","lineno":"%s","symbol":"%s","values":["%s"]},' % (k.filename, k.lineno, name, '","'.join(map(str,v)))
+      sys.exit(0)
+
+
     constructor_params = defaultdict(set)
     for class_name, val in pysonar.getMethodInvocationInfo().items():
         print class_name
@@ -33,3 +47,4 @@ if __name__ == '__main__':
                     constructor_params[class_name].add(first_constructor_arg)
 #            print '\t', constrargs, map(lambda arg: convertName(arg, env), args)
     print constructor_params
+
